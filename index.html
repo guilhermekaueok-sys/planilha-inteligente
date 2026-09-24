@@ -6,30 +6,14 @@
   <meta name="theme-color" content="#050814" />
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
-  <link rel="icon" href="./logo.jpg" />
+  <link rel="icon" href="./logo-pi.svg" />
   <link rel="stylesheet" href="./styles.css" />
-  <link rel="stylesheet" href="./jarvis-theme.css?v=10" />
+  <link rel="stylesheet" href="./jarvis-theme.css?v=11" />
 </head>
 <body>
-  <div id="chrome-only" hidden>
-    <div class="chrome-card">
-      <p class="kicker">Planilha Inteligente</p>
-      <h1>Abra no Google Chrome</h1>
-      <p class="muted" id="chrome-url"></p>
-    </div>
-  </div>
-  <div id="gate" hidden>
-    <div class="gate-card">
-      <p class="kicker">Planilha Inteligente</p>
-      <h1>Identifique-se para iniciar</h1>
-      <input id="gateName" placeholder="Como quer ser chamado" autocomplete="name">
-      <button class="btn" id="gateStart" type="button">Iniciar</button>
-      <p class="muted" id="gateErr"></p>
-    </div>
-  </div>
   <header class="topbar">
     <button class="btn ghost" id="menu" type="button">Menu</button>
-    <div class="j-mark">PI</div>
+    <img class="brand-logo" src="./logo-pi.svg" alt="P.I.">
     <strong class="brand-abrev">P.I.</strong>
     <label class="hud-file">Escolher ficheiro <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
       <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
@@ -38,10 +22,19 @@
     <label class="hud-field">E-mail <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail"></label>
     <span class="zoom-box"><button type="button" data-zoom="-">A−</button><button type="button" data-zoom="+">A+</button></span>
   </header>
+  <div id="chrome-only" hidden></div>
+  <div id="gate" hidden>
+    <div class="gate-card">
+      <h1>Identifique-se</h1>
+      <input id="gateName" placeholder="Como quer ser chamado" autocomplete="name">
+      <button class="btn" id="gateStart" type="button">Iniciar</button>
+      <p class="muted" id="gateErr"></p>
+    </div>
+  </div>
   <div class="app">
     <aside class="side" id="side">
       <div class="brand">
-        <div class="j-mark lg">PI</div>
+        <img class="brand-logo lg" src="./logo-pi.svg" alt="Planilha Inteligente">
         <div>
           <strong class="brand-abrev">P.I.</strong>
           <div class="brand-title" id="whoami">Planilha Inteligente</div>
@@ -63,26 +56,16 @@
     </aside>
     <main class="main" id="view"></main>
     <aside class="dock" id="dock">
-      <div class="dock-head"><strong>Chat da planilha</strong><span class="muted">tempo real</span></div>
+      <div class="dock-head"><strong>Turma ao vivo</strong><span class="muted">direita</span></div>
       <div class="dock-log" id="dockLog"></div>
-      <div class="dock-in"><input id="dockIn" placeholder="segunda port infor rlm"><button class="btn" id="dockSend" type="button">Enviar</button></div>
+      <div class="dock-in"><input id="dockIn" placeholder="Mensagem para a turma"><button class="btn" id="dockSend" type="button">Enviar</button></div>
     </aside>
   </div>
-  <script>
-    (function () {
-      var ua = navigator.userAgent || "";
-      var chrome = (/Chrome\//.test(ua) || /CriOS\//.test(ua)) && !/Edg|OPR|Opera|SamsungBrowser|Firefox|FxiOS/.test(ua);
-      var gate = document.getElementById("chrome-only");
-      var url = document.getElementById("chrome-url");
-      if (url) url.textContent = location.href;
-      if (!chrome && gate) { gate.hidden = false; document.documentElement.classList.add("chrome-blocked"); }
-    })();
-  </script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="./engine.js"></script>
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
   <script src="./app.js"></script>
-  <script src="./jarvis-patch.js?v=10"></script>
+  <script src="./jarvis-patch.js?v=11"></script>
 </body>
 </html>
