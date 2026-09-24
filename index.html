@@ -7,7 +7,7 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo.jpg" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=10" />
 </head>
 <body>
   <div id="chrome-only" hidden>
@@ -28,6 +28,7 @@
   </div>
   <header class="topbar">
     <button class="btn ghost" id="menu" type="button">Menu</button>
+    <div class="j-mark">PI</div>
     <strong class="brand-abrev">P.I.</strong>
     <label class="hud-file">Escolher ficheiro <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
       <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
@@ -39,7 +40,7 @@
   <div class="app">
     <aside class="side" id="side">
       <div class="brand">
-        <div class="j-mark">PI</div>
+        <div class="j-mark lg">PI</div>
         <div>
           <strong class="brand-abrev">P.I.</strong>
           <div class="brand-title" id="whoami">Planilha Inteligente</div>
@@ -80,6 +81,7 @@
   <script src="./engine.js"></script>
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
-  <script src="./app.js"></script>
+  <script src="./app-a.js?v=10"></script>
+  <script src="./app-b.js?v=10"></script>
 </body>
 </html>
