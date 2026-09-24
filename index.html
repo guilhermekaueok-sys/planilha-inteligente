@@ -7,8 +7,8 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-pi.svg" />
-  <link rel="stylesheet" href="./styles.css" />
-  <link rel="stylesheet" href="./jarvis-theme.css?v=11" />
+  <link rel="stylesheet" href="./styles.css?v=12" />
+  <link rel="stylesheet" href="./jarvis-theme.css?v=12" />
 </head>
 <body>
   <header class="topbar">
@@ -22,7 +22,6 @@
     <label class="hud-field">E-mail <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail"></label>
     <span class="zoom-box"><button type="button" data-zoom="-">A−</button><button type="button" data-zoom="+">A+</button></span>
   </header>
-  <div id="chrome-only" hidden></div>
   <div id="gate" hidden>
     <div class="gate-card">
       <h1>Identifique-se</h1>
@@ -35,10 +34,7 @@
     <aside class="side" id="side">
       <div class="brand">
         <img class="brand-logo lg" src="./logo-pi.svg" alt="Planilha Inteligente">
-        <div>
-          <strong class="brand-abrev">P.I.</strong>
-          <div class="brand-title" id="whoami">Planilha Inteligente</div>
-        </div>
+        <div><strong class="brand-abrev">P.I.</strong><div class="brand-title" id="whoami">Planilha Inteligente</div></div>
       </div>
       <nav>
         <button type="button" data-nav="comando"><i></i>Início</button>
@@ -66,6 +62,7 @@
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
   <script src="./app.js"></script>
-  <script src="./jarvis-patch.js?v=11"></script>
+  <script src="./app-a.js?v=12"></script>
+  <script src="./app-b.js?v=12"></script>
 </body>
 </html>
