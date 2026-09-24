@@ -19,7 +19,7 @@
   </div>
   <div id="gate" hidden>
     <div class="gate-card">
-      <p class="kicker">JARVIS · Planilha Inteligente</p>
+      <p class="kicker">Planilha Inteligente</p>
       <h1>Identifique-se para iniciar</h1>
       <input id="gateName" placeholder="Como quer ser chamado" autocomplete="name">
       <button class="btn" id="gateStart" type="button">Iniciar</button>
@@ -28,8 +28,7 @@
   </div>
   <header class="topbar">
     <button class="btn ghost" id="menu" type="button">Menu</button>
-    <div class="j-mark">J</div>
-    <strong class="brand-name">JARVIS</strong>
+    <strong class="brand-abrev">P.I.</strong>
     <label class="hud-file">Escolher ficheiro <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
       <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
     </label>
@@ -39,7 +38,13 @@
   </header>
   <div class="app">
     <aside class="side" id="side">
-      <div class="brand"><div class="j-mark">J</div><div><strong>JARVIS</strong><div class="muted" id="whoami">GCM Nísia Floresta</div></div></div>
+      <div class="brand">
+        <div class="j-mark">PI</div>
+        <div>
+          <strong class="brand-abrev">P.I.</strong>
+          <div class="brand-title" id="whoami">Planilha Inteligente</div>
+        </div>
+      </div>
       <nav>
         <button type="button" data-nav="comando"><i></i>Início</button>
         <button type="button" data-nav="ciclo"><i></i>Plano de Estudos</button>
@@ -53,13 +58,12 @@
         <button type="button" data-nav="anki"><i></i>Anki</button>
         <button type="button" data-nav="turma"><i></i>Turma</button>
       </nav>
-      <div class="side-tools"><div class="zoom-box"><button type="button" data-zoom="-">A−</button><span class="muted" id="zoomLbl">100%</span><button type="button" data-zoom="+">A+</button></div></div>
     </aside>
     <main class="main" id="view"></main>
     <aside class="dock" id="dock">
-      <div class="dock-head"><strong>Turma ao vivo</strong><span class="muted">direita</span></div>
+      <div class="dock-head"><strong>Chat da planilha</strong><span class="muted">tempo real</span></div>
       <div class="dock-log" id="dockLog"></div>
-      <div class="dock-in"><input id="dockIn" placeholder="Mensagem para a turma"><button class="btn" id="dockSend" type="button">Enviar</button></div>
+      <div class="dock-in"><input id="dockIn" placeholder="segunda port infor rlm"><button class="btn" id="dockSend" type="button">Enviar</button></div>
     </aside>
   </div>
   <script>
