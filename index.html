@@ -7,18 +7,10 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-pi.svg" />
-  <link rel="stylesheet" href="./styles.css?v=13" />
+  <link rel="stylesheet" href="./styles.css?v=14" />
 </head>
 <body>
-  <div id="chrome-only" hidden>
-    <div class="chrome-card">
-      <img class="mark" src="./logo.jpg" alt="">
-      <p class="kicker">Planilha Inteligente</p>
-      <h1>Abra no Google Chrome</h1>
-      <p class="sub">Este app foi programado para rodar só no Chrome.</p>
-      <p class="muted" id="chrome-url"></p>
-    </div>
-  </div>
+  <div id="chrome-only" hidden></div>
   <div id="gate" hidden>
     <div class="gate-card">
       <p class="kicker">JARVIS · Planilha Inteligente</p>
@@ -37,22 +29,16 @@
     <button class="btn ghost" id="menu" type="button">Menu</button>
     <img class="brand-logo" src="./logo-pi.svg" alt="P.I.">
     <strong class="brand-abrev">P.I.</strong>
-    <label class="hud-file">
-      Escolher ficheiro
-      <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
+    <label class="hud-file">Escolher ficheiro<span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
       <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
     </label>
-    <label class="hud-field">Nome
-      <input id="topName" autocomplete="name" placeholder="Nome">
-    </label>
-    <label class="hud-field">E-mail
-      <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail">
-    </label>
+    <label class="hud-field">Nome<input id="topName" autocomplete="name" placeholder="Nome"></label>
+    <label class="hud-field">E-mail<input id="topEmail" type="email" autocomplete="email" placeholder="E-mail"></label>
     <span class="zoom-box">
       <button type="button" data-zoom="-">A−</button>
       <button type="button" data-zoom="+">A+</button>
-      <button type="button" data-view="barras" title="Ver em barras">Barras</button>
-      <button type="button" data-view="blocos" title="Ver em blocos">Blocos</button>
+      <button type="button" data-view="barras">Barras</button>
+      <button type="button" data-view="blocos">Blocos</button>
     </span>
   </header>
   <div class="app">
@@ -78,15 +64,6 @@
         <button type="button" data-nav="turma"><i></i>Turma</button>
         <button type="button" id="logoutBtn" class="logout-btn">Sair</button>
       </nav>
-      <div class="side-tools">
-        <div class="zoom-box">
-          <button type="button" data-zoom="-">A−</button>
-          <span class="muted" id="zoomLbl">100%</span>
-          <button type="button" data-zoom="+">A+</button>
-          <button type="button" data-view="barras" title="Barras">Barras</button>
-          <button type="button" data-view="blocos" title="Blocos">Blocos</button>
-        </div>
-      </div>
     </aside>
     <main class="main" id="view"></main>
     <aside class="dock" id="dock">
@@ -94,10 +71,7 @@
         <strong>Na plataforma agora</strong>
         <div class="muted" id="presenceList">só você</div>
       </div>
-      <div class="dock-head">
-        <strong>Turma ao vivo</strong>
-        <span class="muted">direita</span>
-      </div>
+      <div class="dock-head"><strong>Turma ao vivo</strong></div>
       <div class="dock-log" id="dockLog"></div>
       <div class="dock-in">
         <input id="dockIn" placeholder="Mensagem para a turma">
@@ -105,19 +79,6 @@
       </div>
     </aside>
   </div>
-  <script>
-    (function () {
-      var ua = navigator.userAgent || "";
-      var chrome = /Chrome\/|CriOS\/|Safari\/|SamsungBrowser|Firefox|FxiOS/.test(ua);
-      var gate = document.getElementById("chrome-only");
-      var url = document.getElementById("chrome-url");
-      if (url) url.textContent = location.href;
-      if (!chrome && gate) {
-        gate.hidden = false;
-        document.documentElement.classList.add("chrome-blocked");
-      }
-    })();
-  </script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -127,6 +88,8 @@
   <script src="./engine.js"></script>
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
-  <script src="./app.js"></script>
+  <script src="./app-boot.js?v=14"></script>
+  <script src="./app-pages.js?v=14"></script>
+  <script src="./app-ui.js?v=14"></script>
 </body>
 </html>
