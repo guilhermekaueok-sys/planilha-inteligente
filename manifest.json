@@ -1,0 +1,13 @@
+{
+  "name": "Planilha Inteligente",
+  "short_name": "Planilha Inteligente",
+  "description": "Cockpit de estudos da Guarda Municipal de Nísia Floresta/RN",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07141c",
+  "theme_color": "#07141c",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

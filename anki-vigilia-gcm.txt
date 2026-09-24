@@ -1,0 +1,26 @@
+#separator:tab
+#html:true
+#tags:column 3
+Qual o valor total da prova objetiva da GCM Nísia Floresta (Edital 02/2026)?	60 questões · 90 pontos. Direito e legislação valem peso 2 e sozinhos somam 60 dos 90 pontos.	vigilia gcm prova
+Quantas questões de Língua Portuguesa caem na prova da GCM Nísia Floresta?	18 questões, peso 1, 18 pontos. É a maior disciplina comum. Aprovação exige 50% em cada disciplina.	vigilia port
+Quantas questões de Matemática / RLM?	6 questões, peso 1, 6 pontos.	vigilia rlm
+Quantas questões de Informática?	6 questões, peso 1, 6 pontos.	vigilia infor
+Quantas questões de Noções de Direito e Legislação?	30 questões, peso 2, 60 pontos. Metade das questões e 2/3 da nota.	vigilia direito
+Qual o perfil mínimo de aprovação na objetiva?	50% dos pontos em CADA disciplina, não só a média geral. Banca IDIB. Prova em 06/12/2026, 4 horas.	vigilia prova
+O que diz o art. 144 da CF sobre as Guardas Municipais?	Segurança pública é dever do Estado, direito e responsabilidade de todos. Guardas municipais destinam-se à proteção de bens, serviços e instalações municipais. Não exercem polícia judiciária.	vigilia const alta
+Quais os artigos-chave da Lei 13.022/2014 cobrados em prova de GM?	Art. 3º princípios (DH, preservação da vida, patrulhamento preventivo, uso progressivo da força). Arts. 5º e 6º competências gerais e específicas. Natureza: civil, uniformizada e armada.	vigilia 13022 alta
+A Guarda Municipal pode investigar crime e exercer polícia judiciária?	Não. Atuação é preventiva. Polícia judiciária é da Polícia Civil (e Federal, no âmbito respectivo). Questão clássica que pega quem confunde GM com PC/PM.	vigilia proc alta
+Cite 3 crimes contra a Administração Pública que mais caem.	Peculato (312), concussão (316), corrupção passiva (317) / ativa (333). Também prevaricação e advocacia administrativa.	vigilia penal alta
+Quais leis extravagantes o edital de Nísia Floresta amarra à atuação da GCM?	Maria da Penha (11.340/2006), ECA (8.069/1990), Estatuto do Desarmamento (10.826/2003), Abuso de Autoridade (13.869/2019) e CTB quando couber à Guarda.	vigilia extrav
+O que é uso diferenciado / progressivo da força?	Legalidade, necessidade, proporcionalidade. Só o necessário para cessar a agressão, na medida da resistência. Princípio da Lei 13.022 e da formação SENASP.	vigilia dh
+O que estudar de legislação municipal de Nísia Floresta?	LC 048/2025 (GCM local), Lei Orgânica do Município e Estatuto dos Servidores (Lei 006/2013). Alto peso local, pouca série histórica de gabarito.	vigilia local
+Quais temas de Nísia Floresta o Anexo V pede?	História da formação do município, geografia, economia, organização político-administrativa, patrimônio, distritos, vias, equipamentos públicos, meio ambiente e recursos hídricos.	vigilia nisia
+Art. 5º da CF — o que a banca cobra?	Direitos e garantias fundamentais: legalidade, liberdade, devido processo, honra, domicílio, não autoincriminação. Clássico IDIB e de todo concurso de segurança.	vigilia const
+Poder de polícia no Direito Administrativo, em uma linha.	Atributo da Administração de condicionar e restringir direitos em nome do interesse público, com legalidade, finalidade e proporcionalidade.	vigilia admin
+Improbidade: o que mudou com a Lei 14.230/2021 que a prova gosta de cobrar?	Dolo específico; reorganização das categorias; agente público e particular. Cai em prefeitura e no bloco de legislação.	vigilia admin
+Flagrante: qual o limite da Guarda?	Pode prender em flagrante como qualquer do povo (art. 301 CPP) e apresentar à autoridade. Não preside inquérito nem decreta busca domiciliar sem as hipóteses legais.	vigilia proc
+Lei Maria da Penha — o que a GCM precisa saber de cor?	Violência doméstica e familiar contra a mulher; medidas protetivas; dever de prevenção e encaminhamento. Edital de NF inclui o tema na atuação da GCM.	vigilia extrav alta
+ECA — foco de prova de GM.	Criança e adolescente como prioridade; ato infracional; Conselho Tutelar; vedação de exposição vexatória.	vigilia extrav
+Concordância e crase: por que Português pesa tanto neste edital?	São 18 das 60 questões. Interpretação + norma-padrão. Errar Português elimina se ficar abaixo de 50%.	vigilia port
+Proposições e tabela-verdade: o que revisar primeiro?	Conectivos, negação, equivalência (se P então Q = ~P ou Q) e implicação. Padrão IDIB de RLM.	vigilia rlm
+Informática: o que costuma cair em GM nível médio?	Windows, navegador, correio eletrônico, segurança da informação e pacote Office. 6 questões.	vigilia infor
