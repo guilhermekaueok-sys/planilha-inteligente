@@ -77,10 +77,74 @@ const bus = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("vigi
 const live = [];
 let peer = null;
 let liveStatus = "off";
+const DISK = "planilha-inteligente";
+
+function openDisk() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DISK, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains("kv")) req.result.createObjectStore("kv");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function mirrorDisk(raw, savedAt) {
+  openDisk().then((db) => {
+    const tx = db.transaction("kv", "readwrite");
+    tx.objectStore("kv").put({ raw, savedAt }, "state");
+  }).catch(() => {});
+}
+
+function readDisk() {
+  return openDisk().then((db) => new Promise((resolve) => {
+    const g = db.transaction("kv", "readonly").objectStore("kv").get("state");
+    g.onsuccess = () => resolve(g.result || null);
+    g.onerror = () => resolve(null);
+  })).catch(() => null);
+}
 
 function save(s, silent) {
-  localStorage.setItem(KEY, JSON.stringify(s));
+  s.savedAt = Date.now();
+  let raw = "";
+  try {
+    raw = JSON.stringify(s);
+    localStorage.setItem(KEY, raw);
+  } catch (_) {}
+  if (raw) mirrorDisk(raw, s.savedAt);
   if (!silent) pump();
+}
+
+function captureField(el) {
+  if (!el || !S) return;
+  if (el.id === "meName" || el.id === "gateName") S.me.name = el.value;
+  if (el.id === "meHandle") S.me.handle = String(el.value || "").replace(/\s/g, "");
+  if (el.id === "weekIn") S.week = Math.min(14, Math.max(1, Number(el.value) || 1));
+  if (el.dataset && el.dataset.topic) S.topic[el.dataset.topic] = el.value;
+  if (el.dataset && el.dataset.sheet && S.sheet) {
+    const row = S.sheet.rows.find((r) => r.id === el.dataset.row);
+    if (row) {
+      if (el.dataset.sheet === "label") row.label = el.value;
+      else {
+        row.cells[el.dataset.day] = row.cells[el.dataset.day] || blankCell();
+        row.cells[el.dataset.day][el.dataset.sheet] = el.value;
+      }
+    }
+  }
+  if (el.dataset && (el.dataset.q || el.dataset.h)) {
+    const id = el.dataset.q || el.dataset.h;
+    const k = `${S.week}-${id}`;
+    const cur = S.logs[k] || { n: 0, hits: 0 };
+    if (el.dataset.q) cur.n = Math.max(0, Number(el.value) || 0);
+    if (el.dataset.h) cur.hits = Math.max(0, Number(el.value) || 0);
+    S.logs[k] = cur;
+  }
+}
+
+function flushNow() {
+  captureField(document.activeElement);
+  save(S, true);
 }
 
 function pump(extra) {
@@ -953,42 +1017,31 @@ document.addEventListener("click", (e) => {
   }
 });
 document.addEventListener("input", (e) => {
-  if (e.target.id === "gateName") S.me.name = e.target.value;
+  captureField(e.target);
+  save(S, true);
 });
 document.addEventListener("change", (e) => {
-  if (e.target.id === "meName") { S.me.name = e.target.value; save(S); }
-  if (e.target.id === "gateName") { S.me.name = e.target.value; }
-  if (e.target.id === "meHandle") { S.me.handle = e.target.value.replace(/\s/g, ""); save(S); }
-  if (e.target.id === "weekIn") { S.week = Math.min(14, Math.max(1, Number(e.target.value) || 1)); save(S); render(); }
-  if (e.target.dataset.topic) { S.topic[e.target.dataset.topic] = e.target.value; save(S); }
-  if (e.target.dataset.sheet) {
-    const row = S.sheet.rows.find((r) => r.id === e.target.dataset.row);
-    if (row) {
-      if (e.target.dataset.sheet === "label") row.label = e.target.value;
-      else {
-        row.cells[e.target.dataset.day] = row.cells[e.target.dataset.day] || blankCell();
-        row.cells[e.target.dataset.day][e.target.dataset.sheet] = e.target.value;
-      }
-      save(S, true);
-      if (e.target.dataset.sheet !== "label") {
-        const foot = document.querySelector(".sheet tfoot");
-        if (foot) {
-          /* keep typing; totals refresh on next full render */
-        }
-      }
-    }
-  }
-  if (e.target.dataset.q || e.target.dataset.h) {
-    const id = e.target.dataset.q || e.target.dataset.h;
-    const k = `${S.week}-${id}`;
-    const cur = S.logs[k] || { n: 0, hits: 0 };
-    if (e.target.dataset.q) cur.n = Math.max(0, Number(e.target.value) || 0);
-    if (e.target.dataset.h) cur.hits = Math.max(0, Number(e.target.value) || 0);
-    S.logs[k] = cur;
-    save(S);
-    render();
-  }
+  captureField(e.target);
+  save(S, true);
+  if (e.target.id === "weekIn" || e.target.dataset.q || e.target.dataset.h) render();
+});
+window.addEventListener("pagehide", flushNow);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushNow();
 });
 
 render();
+readDisk().then((disk) => {
+  if (!disk || !disk.raw) {
+    save(S, true);
+    return;
+  }
+  let parsed = null;
+  try { parsed = JSON.parse(disk.raw); } catch (_) {}
+  if (parsed && (parsed.savedAt || 0) > (S.savedAt || 0)) {
+    S = { ...defaultState(), ...parsed };
+    if (!S.sheet) S.sheet = emptySheet();
+    render();
+  }
+});
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
