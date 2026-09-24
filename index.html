@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#07141c" />
+  <meta name="theme-color" content="#050814" />
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo.jpg" />
@@ -12,24 +12,15 @@
 <body>
   <div id="chrome-only" hidden>
     <div class="chrome-card">
-      <img class="mark" src="./logo.jpg" alt="">
       <p class="kicker">Planilha Inteligente</p>
       <h1>Abra no Google Chrome</h1>
-      <p class="sub">Este app foi programado para rodar só no Chrome. Edge, Firefox e Safari ficam bloqueados.</p>
-      <ol>
-        <li>No PC: dê dois cliques em <strong>ABRIR-NO-CHROME.bat</strong></li>
-        <li>Ou instale o Chrome e cole este endereço na barra</li>
-      </ol>
       <p class="muted" id="chrome-url"></p>
     </div>
   </div>
   <div id="gate" hidden>
     <div class="gate-card">
-      <img class="mark" src="./logo.jpg" alt="">
-      <p class="kicker">Entrada · Planilha Inteligente</p>
+      <p class="kicker">JARVIS · Planilha Inteligente</p>
       <h1>Identifique-se para iniciar</h1>
-      <p class="sub">Escreva seu nome para entrar no cronograma.</p>
-      <label class="muted" for="gateName">Seu nome</label>
       <input id="gateName" placeholder="Como quer ser chamado" autocomplete="name">
       <button class="btn" id="gateStart" type="button">Iniciar</button>
       <p class="muted" id="gateErr"></p>
@@ -37,40 +28,39 @@
   </div>
   <header class="topbar">
     <button class="btn ghost" id="menu" type="button">Menu</button>
-    <img class="mark sm" src="./logo.jpg" alt="">
-    <strong>Planilha Inteligente</strong>
-    <span class="zoom-box">
-      <button type="button" data-zoom="-">A−</button>
-      <button type="button" data-zoom="+">A+</button>
-    </span>
+    <div class="j-mark">J</div>
+    <strong class="brand-name">JARVIS</strong>
+    <label class="hud-file">Escolher ficheiro <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
+      <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
+    </label>
+    <label class="hud-field">Nome <input id="topName" autocomplete="name" placeholder="Nome"></label>
+    <label class="hud-field">E-mail <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail"></label>
+    <span class="zoom-box"><button type="button" data-zoom="-">A−</button><button type="button" data-zoom="+">A+</button></span>
   </header>
   <div class="app">
     <aside class="side" id="side">
-      <div class="brand">
-        <img class="mark" src="./logo.jpg" alt="">
-        <div><strong>Planilha Inteligente</strong><div class="muted" id="whoami">GCM Nísia Floresta</div></div>
-      </div>
+      <div class="brand"><div class="j-mark">J</div><div><strong>JARVIS</strong><div class="muted" id="whoami">GCM Nísia Floresta</div></div></div>
       <nav>
-        <button type="button" data-nav="comando">Comando</button>
-        <button type="button" data-nav="radar">Radar</button>
-        <button type="button" data-nav="edital">Edital + provas</button>
-        <button type="button" data-nav="questoes">Questões</button>
-        <button type="button" data-nav="ciclo">Ciclo</button>
-        <button type="button" data-nav="planilha">Planilha</button>
-        <button type="button" data-nav="anki">Anki</button>
-        <button type="button" data-nav="turma">Turma</button>
-        <button type="button" data-nav="chat">Chat</button>
-        <button type="button" data-nav="sobre">Método</button>
+        <button type="button" data-nav="comando"><i></i>Início</button>
+        <button type="button" data-nav="ciclo"><i></i>Plano de Estudos</button>
+        <button type="button" data-nav="questoes"><i></i>Questões</button>
+        <button type="button" data-nav="ciclo"><i></i>Simulados</button>
+        <button type="button" data-nav="radar"><i></i>Desempenho</button>
+        <button type="button" data-nav="sobre"><i></i>IA Copilot</button>
+        <button type="button" data-nav="edital"><i></i>Edital</button>
+        <button type="button" data-nav="radar"><i></i>Radar</button>
+        <button type="button" data-nav="planilha"><i></i>Mural</button>
+        <button type="button" data-nav="anki"><i></i>Anki</button>
+        <button type="button" data-nav="turma"><i></i>Turma</button>
       </nav>
-      <div class="side-tools">
-        <div class="zoom-box">
-          <button type="button" data-zoom="-">A−</button>
-          <span class="muted" id="zoomLbl">100%</span>
-          <button type="button" data-zoom="+">A+</button>
-        </div>
-      </div>
+      <div class="side-tools"><div class="zoom-box"><button type="button" data-zoom="-">A−</button><span class="muted" id="zoomLbl">100%</span><button type="button" data-zoom="+">A+</button></div></div>
     </aside>
     <main class="main" id="view"></main>
+    <aside class="dock" id="dock">
+      <div class="dock-head"><strong>Turma ao vivo</strong><span class="muted">direita</span></div>
+      <div class="dock-log" id="dockLog"></div>
+      <div class="dock-in"><input id="dockIn" placeholder="Mensagem para a turma"><button class="btn" id="dockSend" type="button">Enviar</button></div>
+    </aside>
   </div>
   <script>
     (function () {
@@ -79,13 +69,13 @@
       var gate = document.getElementById("chrome-only");
       var url = document.getElementById("chrome-url");
       if (url) url.textContent = location.href;
-      if (!chrome && gate) {
-        gate.hidden = false;
-        document.documentElement.classList.add("chrome-blocked");
-      }
+      if (!chrome && gate) { gate.hidden = false; document.documentElement.classList.add("chrome-blocked"); }
     })();
   </script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="./engine.js"></script>
+  <script src="./projetos/gcm-nisia.js"></script>
+  <script src="./projetos/modelo.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
