@@ -7,62 +7,126 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-pi.svg" />
-  <link rel="stylesheet" href="./styles.css?v=12" />
-  <link rel="stylesheet" href="./jarvis-theme.css?v=12" />
+  <link rel="stylesheet" href="./styles.css?v=13" />
 </head>
 <body>
+  <div id="chrome-only" hidden>
+    <div class="chrome-card">
+      <img class="mark" src="./logo.jpg" alt="">
+      <p class="kicker">Planilha Inteligente</p>
+      <h1>Abra no Google Chrome</h1>
+      <p class="sub">Este app foi programado para rodar só no Chrome.</p>
+      <p class="muted" id="chrome-url"></p>
+    </div>
+  </div>
+  <div id="gate" hidden>
+    <div class="gate-card">
+      <p class="kicker">JARVIS · Planilha Inteligente</p>
+      <h1>Identifique-se para iniciar</h1>
+      <label class="muted" for="gateName">Seu nome</label>
+      <input id="gateName" placeholder="Como quer ser chamado" autocomplete="name">
+      <label class="muted" for="gateEmail">E-mail</label>
+      <input id="gateEmail" type="email" placeholder="seu@email.com" autocomplete="email">
+      <label class="muted" for="gatePass">Senha</label>
+      <input id="gatePass" type="password" placeholder="mínimo 6 caracteres" autocomplete="current-password">
+      <button class="btn" id="gateStart" type="button">Entrar</button>
+      <p class="muted" id="gateErr"></p>
+    </div>
+  </div>
   <header class="topbar">
     <button class="btn ghost" id="menu" type="button">Menu</button>
     <img class="brand-logo" src="./logo-pi.svg" alt="P.I.">
     <strong class="brand-abrev">P.I.</strong>
-    <label class="hud-file">Escolher ficheiro <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
+    <label class="hud-file">
+      Escolher ficheiro
+      <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
       <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
     </label>
-    <label class="hud-field">Nome <input id="topName" autocomplete="name" placeholder="Nome"></label>
-    <label class="hud-field">E-mail <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail"></label>
-    <span class="zoom-box"><button type="button" data-zoom="-">A−</button><button type="button" data-zoom="+">A+</button></span>
+    <label class="hud-field">Nome
+      <input id="topName" autocomplete="name" placeholder="Nome">
+    </label>
+    <label class="hud-field">E-mail
+      <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail">
+    </label>
+    <span class="zoom-box">
+      <button type="button" data-zoom="-">A−</button>
+      <button type="button" data-zoom="+">A+</button>
+      <button type="button" data-view="barras" title="Ver em barras">Barras</button>
+      <button type="button" data-view="blocos" title="Ver em blocos">Blocos</button>
+    </span>
   </header>
-  <div id="gate" hidden>
-    <div class="gate-card">
-      <h1>Identifique-se</h1>
-      <input id="gateName" placeholder="Como quer ser chamado" autocomplete="name">
-      <button class="btn" id="gateStart" type="button">Iniciar</button>
-      <p class="muted" id="gateErr"></p>
-    </div>
-  </div>
   <div class="app">
     <aside class="side" id="side">
       <div class="brand">
         <img class="brand-logo lg" src="./logo-pi.svg" alt="Planilha Inteligente">
-        <div><strong class="brand-abrev">P.I.</strong><div class="brand-title" id="whoami">Planilha Inteligente</div></div>
+        <div>
+          <strong class="brand-abrev">P.I.</strong>
+          <div class="brand-title" id="whoami">Planilha Inteligente</div>
+        </div>
       </div>
       <nav>
         <button type="button" data-nav="comando"><i></i>Início</button>
         <button type="button" data-nav="ciclo"><i></i>Plano de Estudos</button>
         <button type="button" data-nav="questoes"><i></i>Questões</button>
         <button type="button" data-nav="ciclo"><i></i>Simulados</button>
-        <button type="button" data-nav="radar"><i></i>Desempenho</button>
+        <button type="button" data-nav="desempenho"><i></i>Desempenho</button>
         <button type="button" data-nav="sobre"><i></i>IA Copilot</button>
         <button type="button" data-nav="edital"><i></i>Edital</button>
         <button type="button" data-nav="radar"><i></i>Radar</button>
         <button type="button" data-nav="planilha"><i></i>Mural</button>
         <button type="button" data-nav="anki"><i></i>Anki</button>
         <button type="button" data-nav="turma"><i></i>Turma</button>
+        <button type="button" id="logoutBtn" class="logout-btn">Sair</button>
       </nav>
+      <div class="side-tools">
+        <div class="zoom-box">
+          <button type="button" data-zoom="-">A−</button>
+          <span class="muted" id="zoomLbl">100%</span>
+          <button type="button" data-zoom="+">A+</button>
+          <button type="button" data-view="barras" title="Barras">Barras</button>
+          <button type="button" data-view="blocos" title="Blocos">Blocos</button>
+        </div>
+      </div>
     </aside>
     <main class="main" id="view"></main>
     <aside class="dock" id="dock">
-      <div class="dock-head"><strong>Turma ao vivo</strong><span class="muted">direita</span></div>
+      <div class="presence" id="presence">
+        <strong>Na plataforma agora</strong>
+        <div class="muted" id="presenceList">só você</div>
+      </div>
+      <div class="dock-head">
+        <strong>Turma ao vivo</strong>
+        <span class="muted">direita</span>
+      </div>
       <div class="dock-log" id="dockLog"></div>
-      <div class="dock-in"><input id="dockIn" placeholder="Mensagem para a turma"><button class="btn" id="dockSend" type="button">Enviar</button></div>
+      <div class="dock-in">
+        <input id="dockIn" placeholder="Mensagem para a turma">
+        <button class="btn" id="dockSend" type="button">Enviar</button>
+      </div>
     </aside>
   </div>
+  <script>
+    (function () {
+      var ua = navigator.userAgent || "";
+      var chrome = /Chrome\/|CriOS\/|Safari\/|SamsungBrowser|Firefox|FxiOS/.test(ua);
+      var gate = document.getElementById("chrome-only");
+      var url = document.getElementById("chrome-url");
+      if (url) url.textContent = location.href;
+      if (!chrome && gate) {
+        gate.hidden = false;
+        document.documentElement.classList.add("chrome-blocked");
+      }
+    })();
+  </script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="./firebase-config.js"></script>
+  <script src="./auth-firebase.js"></script>
   <script src="./engine.js"></script>
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
   <script src="./app.js"></script>
-  <script src="./app-a.js?v=12"></script>
-  <script src="./app-b.js?v=12"></script>
 </body>
 </html>
