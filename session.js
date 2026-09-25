@@ -9,6 +9,8 @@
   let fb = null;
   let timer = 0;
   let mic = null;
+  let jwt = "";
+  let jwtExp = 0;
 
   function esc(s) {
     return String(s || "").replace(/[&<>"']/g, function (c) {
@@ -27,6 +29,20 @@
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return (h >>> 0).toString(16);
   }
+  function readExp(token) {
+    try {
+      const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const json = JSON.parse(atob(part));
+      return (json.exp || 0) * 1000;
+    } catch (_) { return 0; }
+  }
+  async function holdToken(user, force) {
+    if (!user) { jwt = ""; jwtExp = 0; return ""; }
+    if (!force && jwt && jwtExp > Date.now() + 60000) return jwt;
+    jwt = await user.getIdToken(!!force);
+    jwtExp = readExp(jwt);
+    return jwt;
+  }
   function firebaseReady() {
     const c = window.PI_FIREBASE;
     return !!(c && c.apiKey && c.projectId && window.firebase && firebase.auth && firebase.firestore);
@@ -35,11 +51,11 @@
     if (!firebaseReady()) return false;
     if (fb) return true;
     if (!firebase.apps.length) firebase.initializeApp(window.PI_FIREBASE);
-    fb = { auth: firebase.auth(), db: firebase.firestore() };
+    const db = firebase.firestore();
+    try { await db.enablePersistence({ synchronizeTabs: true }); } catch (_) {}
+    fb = { auth: firebase.auth(), db: db };
     try { fb.storage = firebase.storage(); } catch (_) { fb.storage = null; }
-    fb.auth.onIdTokenChanged(async (user) => {
-      window.__piJwt = user ? await user.getIdToken() : "";
-    });
+    fb.auth.onIdTokenChanged(async (user) => { await holdToken(user, false); });
     return true;
   }
   function stateKey(uid) { return "pi-state-v7-" + uid; }
@@ -97,7 +113,7 @@
       else return "Não foi possível entrar agora.";
     }
     const uid = cred.user.uid;
-    window.__piJwt = await cred.user.getIdToken();
+    await holdToken(cred.user, true);
     const remote = await pullRemote(uid);
     adopt(uid, name, mail, remote);
     return "";
@@ -253,12 +269,14 @@
     if (timer) clearInterval(timer);
     timer = 0;
     try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-    window.__piJwt = "";
+    jwt = "";
+    jwtExp = 0;
     window.__piUserLock = false;
     if (fb) { try { await fb.auth.signOut(); } catch (_) {} }
   }
   async function pushState(s) {
-    if (!fb || !s || !s.me || !s.me.id || !s.entered) return;
+    if (!fb || !fb.auth.currentUser || !s || !s.me || !s.me.id || !s.entered) return;
+    if (!(await holdToken(fb.auth.currentUser, false))) return;
     const copy = JSON.parse(JSON.stringify(s));
     delete copy.chats;
     try {
@@ -267,7 +285,13 @@
       });
     } catch (_) {}
   }
-  window.PISession = { enterAccount: enterAccount, exitAccount: exitAccount, afterEnter: afterEnter, pushState: pushState };
+  window.PISession = {
+    enterAccount: enterAccount,
+    exitAccount: exitAccount,
+    afterEnter: afterEnter,
+    pushState: pushState,
+    token: function () { return jwt && jwtExp > Date.now() ? jwt : ""; },
+  };
 
   if (bus) {
     bus.onmessage = (ev) => {
@@ -317,19 +341,23 @@
   window.addEventListener("pagehide", dropPresence);
 
   const saved = (() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } })();
-  if (saved && saved.id && saved.email && window.S) {
-    adopt(saved.id, saved.name || "", saved.email, null);
-    if (typeof render === "function") render({ force: true });
-    bootFirebase().then(async (on) => {
-      if (!on || !fb) { afterEnter(); return; }
+  bootFirebase().then((on) => {
+    if (on && fb) {
       fb.auth.onAuthStateChanged(async (user) => {
         if (!user) return;
-        window.__piJwt = await user.getIdToken();
+        await holdToken(user, true);
         const remote = await pullRemote(user.uid);
-        if (remote && (remote.savedAt || 0) > (S.savedAt || 0)) adopt(user.uid, saved.name || S.me.name, saved.email, remote);
+        const name = (saved && saved.name) || user.displayName || "";
+        adopt(user.uid, name, user.email || (saved && saved.email) || "", remote);
         afterEnter();
         if (typeof render === "function") render({ force: true });
       });
-    });
-  }
+      return;
+    }
+    if (saved && saved.id && saved.email && window.S) {
+      adopt(saved.id, saved.name || "", saved.email, null);
+      afterEnter();
+      if (typeof render === "function") render({ force: true });
+    }
+  });
 })();
