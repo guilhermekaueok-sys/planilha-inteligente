@@ -76,8 +76,9 @@ Outra chave é ignorada. Outro comando não muda nada.
   }
 
   function ler(text) {
-    if (typeof parseEditalText !== "function") return { ok: false, motivo: "Leitor ausente." };
     if (!text || String(text).length < 40) return { ok: false, motivo: "O arquivo não trouxe texto para o leitor." };
+    if (typeof parseEdital === "function") return aplicar(parseEdital(text));
+    if (typeof parseEditalText !== "function") return { ok: false, motivo: "Leitor ausente." };
     return aplicar(packDe(parseEditalText(text)));
   }
 
