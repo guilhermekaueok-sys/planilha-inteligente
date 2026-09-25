@@ -19,21 +19,28 @@
   var vs = "attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
   var fs = [
     "precision mediump float;",
-    "uniform sampler2D uTex;uniform float uTime;uniform vec2 uRes;uniform vec2 uTexel;",
+    "uniform sampler2D uTex;uniform float uTime;uniform vec2 uRes;",
     "void main(){",
+    "vec3 navy=vec3(0.020,0.031,0.078);",
     "vec2 uv=gl_FragCoord.xy/uRes;",
-    "uv+=0.015*vec2(sin(uTime*0.07),cos(uTime*0.05));",
-    "vec2 px=uTexel*2.4;",
-    "vec3 c=texture2D(uTex,uv).rgb*0.40;",
-    "c+=texture2D(uTex,uv+vec2(px.x,0.0)).rgb*0.15;",
-    "c+=texture2D(uTex,uv-vec2(px.x,0.0)).rgb*0.15;",
-    "c+=texture2D(uTex,uv+vec2(0.0,px.y)).rgb*0.15;",
-    "c+=texture2D(uTex,uv-vec2(0.0,px.y)).rgb*0.15;",
-    "float warm=clamp(c.r-c.b,0.0,0.5);",
-    "c=mix(c,vec3(c.b*0.7,c.g*0.85,c.r),warm);",
-    "c*=vec3(0.45,0.78,1.05);",
-    "vec2 p=(uv-0.5)*vec2(1.2,1.05);",
-    "c=mix(c,vec3(0.02,0.032,0.07),smoothstep(0.12,0.92,length(p))*0.78);",
+    "float aspect=uRes.x/max(uRes.y,1.0);",
+    "vec2 p=uv-vec2(0.58,0.64);",
+    "p.x*=aspect;",
+    "float ang=0.11*sin(uTime*0.42);",
+    "float cs=cos(ang);float sn=sin(ang);",
+    "vec2 r=vec2(cs*p.x-sn*p.y,sn*p.x+cs*p.y);",
+    "r.y+=0.025*sin(uTime*0.31);",
+    "float breathe=1.0+0.045*sin(uTime*0.52);",
+    "r/=breathe;",
+    "vec2 tuv=vec2(r.x/aspect,r.y)*1.12+0.5;",
+    "vec2 px=vec2(0.6/1024.0,0.6/720.0);",
+    "vec3 c=texture2D(uTex,tuv).rgb;",
+    "c=c*0.82+texture2D(uTex,tuv+px).rgb*0.06+texture2D(uTex,tuv-px).rgb*0.06+texture2D(uTex,tuv+vec2(px.x,-px.y)).rgb*0.03+texture2D(uTex,tuv+vec2(-px.x,px.y)).rgb*0.03;",
+    "float filament=pow(clamp(c.b,0.0,1.0),1.6);",
+    "c+=vec3(0.015,0.05,0.10)*filament*(0.5+0.5*sin(uTime*1.15+length(p)*7.0));",
+    "float edge=smoothstep(0.42,1.15,length(p));",
+    "c=mix(c,navy,edge*0.35);",
+    "if(tuv.x<0.0||tuv.y<0.0||tuv.x>1.0||tuv.y>1.0) c=navy;",
     "gl_FragColor=vec4(c,1.0);",
     "}",
   ].join("");
@@ -61,7 +68,6 @@
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   var uTime = gl.getUniformLocation(prog, "uTime");
   var uRes = gl.getUniformLocation(prog, "uRes");
-  var uTexel = gl.getUniformLocation(prog, "uTexel");
   var tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -79,7 +85,7 @@
     lastDraw = 0;
     if (reduced) requestAnimationFrame(draw);
   };
-  img.src = "./fundo-nebulosa.jpg";
+  img.src = "./fundo-orbe.jpg";
   var dpr = Math.min(window.devicePixelRatio || 1, 1.25);
   var slow = 0;
   var lastDraw = 0;
@@ -110,7 +116,6 @@
     var t0 = performance.now();
     gl.uniform1f(uTime, t * 0.001);
     gl.uniform2f(uRes, canvas.width, canvas.height);
-    gl.uniform2f(uTexel, 1 / canvas.width, 1 / canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     if (performance.now() - t0 > 12 && dpr > 0.7) {
       dpr = Math.max(0.7, dpr * 0.8);
@@ -128,7 +133,7 @@
     }
     if (!running) {
       running = true;
-      last = 0;
+      lastDraw = 0;
       requestAnimationFrame(draw);
     }
   });

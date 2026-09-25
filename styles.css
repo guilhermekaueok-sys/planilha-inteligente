@@ -31,7 +31,7 @@ body::before { content: none; }
 html.no-gpu body::before {
   content: "";
   position: fixed; inset: -8%; z-index: 0; pointer-events: none;
-  background: #050814 url("./fundo-nebulosa.jpg") center 40% / cover no-repeat;
+  background: #050814 url("./fundo-orbe.jpg") center 42% / 72% auto no-repeat;
   filter: blur(16px) saturate(.8) brightness(.7);
 }
 body::after {
@@ -225,7 +225,7 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.0
 }
 .wave i:nth-child(odd) { animation-delay: .15s; height: 28px; }
 .wave i:nth-child(3n) { animation-delay: .3s; height: 40px; }
-@keyframes wave { 50% { transform: scaleY(.35); opacity: .6; } }
+@keyframes wave { 50% { transform: scaleY(.22); opacity: .45; } }
 .copilot-lead { margin: 0; color: var(--muted); font-size: 13px; }
 .voice-btn {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
@@ -285,7 +285,7 @@ input:focus, select:focus, textarea:focus {
   border-radius: 50%;
   display: grid; place-items: center;
   background: conic-gradient(var(--mint) var(--p, 0%), rgba(60,230,255,.12) 0);
-  box-shadow: 0 0 40px rgba(60,230,255,.2);
+  box-shadow: 0 0 36px rgba(60,230,255,.38);
 }
 .ring > span {
   width: 150px; height: 150px; border-radius: 50%;
@@ -371,7 +371,7 @@ input:focus, select:focus, textarea:focus {
   to { opacity: 1; transform: none; }
 }
 @keyframes pulseGlow {
-  50% { transform: scale(1.02); }
+  50% { transform: scale(1.04); }
 }
 @keyframes fillBar {
   from { transform: scaleX(0); }
@@ -388,7 +388,8 @@ input:focus, select:focus, textarea:focus {
 .ring { animation: pulseGlow 2.8s ease-in-out infinite; }
 .bar > i {
   transform-origin: left center;
-  animation: fillBar .7s ease both;
+  box-shadow: 0 0 12px rgba(60,230,255,.55);
+  animation: fillBar .55s cubic-bezier(.2,.8,.2,1) both;
 }
 .side nav button { transition: background .2s ease, color .2s ease, box-shadow .2s ease, padding-left .2s ease; }
 .side nav button:hover { padding-left: 16px; color: var(--fg); }
