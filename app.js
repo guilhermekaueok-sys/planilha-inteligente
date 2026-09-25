@@ -51,6 +51,7 @@ const defaultState = () => ({
   logs: {},
   topic: {},
   userTopics: [],
+  editalDiscs: [],
   simLogs: [],
   editalLido: null,
   me: {
@@ -81,6 +82,7 @@ function blankStudy(s) {
   s.logs = {};
   s.topic = {};
   s.userTopics = [];
+  s.editalDiscs = [];
   s.simLogs = [];
   s.editalLido = null;
   s.board = null;
@@ -94,9 +96,22 @@ function blankStudy(s) {
   s.blanked = "v8";
   return s;
 }
+function purgeOldEdital(s) {
+  if (!s) return s;
+  const bad = /juiz de fora/i;
+  const blob = JSON.stringify({ a: s.editalLido || null, b: s.editalDiscs || [], c: s.userTopics || [], d: s.me && s.me.exam });
+  if (bad.test(blob)) {
+    s.editalLido = null;
+    s.editalDiscs = [];
+    s.userTopics = [];
+    if (s.me) s.me.exam = "";
+  }
+  if (!Array.isArray(s.editalDiscs)) s.editalDiscs = [];
+  return s;
+}
 function load() {
-  try { return blankStudy({ ...defaultState(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }); }
-  catch { return blankStudy(defaultState()); }
+  try { return purgeOldEdital(blankStudy({ ...defaultState(), ...JSON.parse(localStorage.getItem(KEY) || "{}") })); }
+  catch { return purgeOldEdital(blankStudy(defaultState())); }
 }
 const bus = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("vigilia-gcm") : null;
 const live = [];
@@ -381,8 +396,11 @@ function boardCell(meta, slot, ciclo) {
   const b = S.board && S.board[meta] && S.board[meta].slots[slot];
   return (b && b[ciclo]) || blankCell();
 }
+function editalDiscs() {
+  return Array.isArray(S && S.editalDiscs) ? S.editalDiscs : [];
+}
 function discOpts(sel) {
-  return [{ id: "", sigla: "—" }, { id: "sim", sigla: "Simulado" }, ...DISC]
+  return [{ id: "", sigla: "—" }, { id: "sim", sigla: "Simulado" }, ...editalDiscs()]
     .map((o) => `<option value="${o.id}" ${o.id === sel ? "selected" : ""}>${o.sigla}</option>`).join("");
 }
 const DAYHEAD = { i: "SEGUNDA", ii: "TERÇA", iii: "QUARTA", iv: "QUINTA", v: "SEXTA", vi: "SÁBADO", vii: "DOMINGO" };
@@ -441,17 +459,18 @@ function discsPlanned(dayId) {
       if (id && id !== "sim" && seen.indexOf(id) === -1) seen.push(id);
     });
   }
-  return seen.map((id) => DISC.find((d) => d.id === id)).filter(Boolean);
+  return seen.map((id) => editalDiscs().find((d) => d.id === id)).filter(Boolean);
 }
 function planHasDiscs() {
   return DAYS.some((d) => discsPlanned(d.id).length);
 }
 function seedBoard() {
   const bag = [];
-  DISC.forEach((d) => {
+  editalDiscs().forEach((d) => {
     const w = Math.max(1, Math.round(importance(d) * 10));
     for (let i = 0; i < w; i++) bag.push(d.id);
   });
+  if (!bag.length) return emptyBoard();
   const board = emptyBoard();
   board.forEach((meta, mi) => {
     CICLOS.forEach((c, ci) => {
@@ -490,10 +509,11 @@ function emptySheet() {
 }
 function seedSheetFromCycle() {
   const bag = [];
-  DISC.forEach((d) => {
+  editalDiscs().forEach((d) => {
     const w = Math.max(1, Math.round(importance(d) * 10));
     for (let i = 0; i < w; i++) bag.push(d.id);
   });
+  if (!bag.length) return emptySheet();
   const sheet = emptySheet();
   DAYS.forEach((day, di) => {
     sheet.rows.forEach((row, ri) => {
@@ -513,7 +533,7 @@ function sheetCsv() {
   S.sheet.rows.forEach((row) => {
     const disc = DAYS.map((d) => {
       const id = row.cells[d.id].disc;
-      const found = DISC.find((x) => x.id === id);
+      const found = editalDiscs().find((x) => x.id === id);
       return found ? found.sigla : (id === "sim" ? "Simulado" : id);
     });
     const horas = DAYS.map((d) => row.cells[d.id].horas || "");
@@ -781,18 +801,8 @@ const DECK = "Planilha Inteligente::GCM Nísia Floresta";
 const ANKI_URL = "http://127.0.0.1:8765";
 
 function cards() {
-  return [
-    ["Qual o valor total da prova objetiva da GCM Nísia Floresta (Edital 02/2026)?", "60 questões · 90 pontos. Direito e legislação valem peso 2 e sozinhos somam 60 dos 90 pontos.", ["prova"]],
-    ["Quantas questões de Língua Portuguesa caem na prova?", "18 questões, peso 1, 18 pontos. Aprovação exige 50% em cada disciplina.", ["port"]],
-    ["Quantas questões de Matemática / RLM?", "6 questões, peso 1, 6 pontos.", ["rlm"]],
-    ["Quantas questões de Informática?", "6 questões, peso 1, 6 pontos.", ["infor"]],
-    ["Quantas questões de Noções de Direito e Legislação?", "30 questões, peso 2, 60 pontos. Metade das questões e 2/3 da nota.", ["direito"]],
-    ["Qual o perfil mínimo de aprovação na objetiva?", "50% dos pontos em CADA disciplina. Banca IDIB. Prova 06/12/2026, 4 horas.", ["prova"]],
-    ...TOPICS.map((t) => {
-      const d = DISC.find((x) => x.id === t.d);
-      return [t.t + " — o que revisar?", `${t.reps}<br><br>Disciplina: ${d.name} (${d.pts} pts). ${t.caiu ? "Já caiu em prova de GM/prefeitura." : "Só no edital de NF — peso local."}`, [t.d, t.caiu ? "caiu" : "edital"]];
-    }),
-  ];
+  const topics = Array.isArray(S.userTopics) ? S.userTopics : [];
+  return topics.map((t) => [t.t, "Disciplina: " + (t.disc || "assunto"), [t.d || "edital"]]);
 }
 
 async function anki(action, params = {}) {
@@ -842,6 +852,107 @@ function paintDock() {
   log.innerHTML = fallback.map((m) => `<div class="dock-msg ${m.from}">${m.text}</div>`).join("");
   log.scrollTop = log.scrollHeight;
 }
+function foldName(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+}
+function discIdOf(name) {
+  return foldName(name).replace(/[^a-z0-9]+/g, "").slice(0, 24) || "disc";
+}
+function discSigla(name) {
+  const stop = { das: 1, dos: 1, de: 1, da: 1, do: 1, e: 1, para: 1, com: 1, em: 1, no: 1, na: 1 };
+  const parts = String(name || "").split(/\s+/).filter((w) => w.length > 2 && !stop[foldName(w)]);
+  if (!parts.length) return "DISC";
+  if (parts.length === 1) return parts[0].slice(0, 10);
+  return parts.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
+}
+function parseEditalText(raw) {
+  const text = String(raw || "").replace(/\r/g, "");
+  const lines = text.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const flat = lines.join(" ");
+  const cargo = (flat.match(/cargo\s*[:\-]\s*([^.]{4,80})/i) || [])[1] || "";
+  const banca = (flat.match(/\b(IDIB|VUNESP|CESPE|CEBRASPE|AOCP|IBFC|FGV|FUNDATEC|SELECON|CONSULPLAN|INQC|ABCP|QUADRIX|INSTITUTO AOCP)\b/i) || [])[1] || "";
+  const prova = (flat.match(/(?:data da prova|prova objetiva)[^\d]{0,24}(\d{1,2}\/\d{2}\/\d{4})/i) || [])[1] || "";
+  const insc = (flat.match(/inscri[cç][aã]o[^\d]{0,40}(\d{1,2}\/\d{2}\/\d{4}.{0,24}\d{1,2}\/\d{2}\/\d{4})/i) || [])[1] || "";
+  const taxa = (flat.match(/R\$\s*[\d.]+(?:,\d{2})?/) || [])[0] || "";
+  const link = (flat.match(/https?:\/\/[^\s)]+/) || [])[0] || "";
+  const hint = /portugu[eê]s|matem[aá]tica|racioc[ií]nio|inform[aá]tica|direito|legisla[cç][aã]o|administra[cç][aã]o|constitucional|penal|processo|contabilidade|atualidades|conhecimentos|l[ií]ngua|reda[cç][aã]o|estatuto|hist[oó]ria|geografia|no[cç][oõ]es|seguran[cç]a|guarda|sa[uú]de|enfermagem|pedagogia|f[ií]sica|qu[ií]mica|biologia|ingl[eê]s|espanhol/i;
+  const discs = [];
+  const topics = [];
+  let cur = null;
+  const seen = {};
+  lines.forEach((line) => {
+    if (line.length > 90) return;
+    const qtd = line.match(/^(.{4,70}?)\s*[-–:]\s*(\d{1,3})\s*quest/i);
+    const head = line.replace(/\s+\d{1,3}\s*quest(?:ões|oes)?\.?$/i, "").replace(/[:\-–]\s*$/, "");
+    const looks = hint.test(head) && head.length <= 70 && !/^\d+[\.\)]/.test(head) && head.split(" ").length <= 10;
+    const onlyName = looks && !/[.]/.test(head) && head.split(" ").length <= 8;
+    if (qtd || onlyName) {
+      const name = (qtd ? qtd[1] : head).replace(/^\d+[\.\)]\s*/, "").trim();
+      const id = discIdOf(name);
+      if (seen[id] || name.length < 4) return;
+      seen[id] = 1;
+      cur = { id: id, sigla: discSigla(name), name: name, pesoOf: 1, pts: qtd ? Number(qtd[2]) : 1, q: qtd ? Number(qtd[2]) : 0, editais: 1, provas: 1, n: 1 };
+      discs.push(cur);
+      return;
+    }
+    if (cur && /^(?:\d+[\.\)]|[-•])\s+\S/.test(line)) {
+      topics.push({ id: "u" + topics.length, disc: cur.name, d: cur.id, t: line.replace(/^(?:\d+[\.\)]|[-•])\s+/, "").slice(0, 180) });
+    }
+  });
+  return {
+    meta: { cargo: cargo.trim(), prova: prova, banca: banca, inscricao: insc, taxa: taxa, linkInscricao: link, linkBanca: "" },
+    discs: discs,
+    topics: topics,
+  };
+}
+function applyParsedEdital(parsed) {
+  const ids = { sim: 1 };
+  S.editalDiscs = parsed.discs || [];
+  S.userTopics = parsed.topics || [];
+  S.editalLido = parsed.meta || {};
+  S.editalDiscs.forEach((d) => { ids[d.id] = 1; });
+  (S.board || []).forEach((meta) => (meta.slots || []).forEach((slot) => {
+    Object.keys(slot || {}).forEach((k) => {
+      if (slot[k] && slot[k].disc && !ids[slot[k].disc]) slot[k].disc = "";
+    });
+  }));
+}
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      ok(window.pdfjsLib);
+    };
+    s.onerror = fail;
+    document.head.appendChild(s);
+  });
+}
+async function textFromPdf(buf) {
+  const pdfjs = await loadPdfJs();
+  const doc = await pdfjs.getDocument({ data: buf }).promise;
+  let out = "";
+  const n = Math.min(doc.numPages, 40);
+  for (let i = 1; i <= n; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    let lastY = null;
+    let line = "";
+    content.items.forEach((item) => {
+      const y = item.transform ? item.transform[5] : 0;
+      if (lastY != null && Math.abs(y - lastY) > 2) {
+        out += line.trim() + "\n";
+        line = "";
+      }
+      line += (item.str || "") + " ";
+      lastY = y;
+    });
+    out += line.trim() + "\n";
+  }
+  return out;
+}
 function foldTxt(s) {
   return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -849,7 +960,7 @@ function resolveDiscToken(token) {
   const t = foldTxt(token).replace(/[^a-z0-9.]+/g, "");
   if (!t) return null;
   if (/^simu?l?a?d?o?$/.test(t) || t === "sim") return "sim";
-  const hit = DISC.find((d) => {
+  const hit = editalDiscs().find((d) => {
     const id = foldTxt(d.id);
     const sg = foldTxt(d.sigla).replace(/[^a-z0-9]+/g, "");
     const nm = foldTxt(d.name);
@@ -1099,8 +1210,9 @@ function render(opts) {
 
 const pages = {
   comando() {
-    const ranked = [...DISC].sort((a, b) => gap(b) - gap(a));
-    const top = ranked[0];
+    const pool = editalDiscs();
+    const ranked = pool.slice().sort((a, b) => gap(b) - gap(a));
+    const top = ranked[0] || null;
     const done = DISC.filter((d) => rate(d.id) !== null).length;
     const avg = (() => {
       const xs = DISC.map((d) => rate(d.id)).filter((x) => x !== null);
@@ -1112,7 +1224,7 @@ const pages = {
     const port = m.port;
     const dir = m.dir;
     const leg = m.leg;
-    const peso = Math.round(importance(top) * 100);
+    const peso = top ? Math.round(importance(top) * 100) : 0;
     const edital = m.edital;
     const qScore = pulse ? pulse.qScore : 0;
     const dScore = pulse && pulse.planned ? pulse.dScore : 0;
@@ -1188,7 +1300,7 @@ const pages = {
         <div class="card">
           <div class="muted">COMANDO · SEMANA ${S.week}</div>
           <h2>${userName() || "Guilherme"}, o que falta, no que pesa.</h2>
-          <p class="muted">${top.sigla} — ${top.name}. Importância ${peso} · ${level(rate(top.id)).label}.</p>
+          <p class="muted">${top ? top.sigla + " — " + top.name + ". Importância " + peso + " · " + level(rate(top.id)).label + "." : "Nenhum edital carregado. Faça o upload do edital para liberar as disciplinas."}</p>
           <div class="row" style="margin-top:12px">
             <button class="btn" data-go="edital">Volume do edital</button>
             <button class="btn ghost" data-go="questoes">Questões</button>
@@ -1204,7 +1316,7 @@ const pages = {
       <h1>HISTÓRICO DE DESEMPENHO DA JORNADA</h1>
       <p class="sub">Um volume por disciplina. Clique para ver acertos, erros e o total desde o primeiro registro.</p>
       <div class="disc-board">
-      ${DISC.map((d) => {
+      ${editalDiscs().length ? editalDiscs().map((d) => {
         const life = window.ATLAS ? ATLAS.journey(d.id) : { n: 0, hits: 0, wrong: 0, pct: 0 };
         const on = open === d.id;
         return `<article class="card disc-item disc-life${on ? " on" : ""}" data-life="${d.id}">
@@ -1218,7 +1330,7 @@ const pages = {
           <div class="bar"><i style="width:${life.n ? Math.max(life.pct, 4) : 0}%"></i></div>
           ${on ? `<p class="life-pop">${life.n ? "Desde o primeiro registro: " + life.n + " resolvidas, " + life.hits + " acertos, " + life.wrong + " erros." : "Ainda sem registro nesta disciplina."}</p>` : ""}
         </article>`;
-      }).join("")}
+      }).join("") : `<p class="muted">Nenhum edital carregado. Faça o upload do edital para liberar as disciplinas.</p>`}
       </div>
     `;
   },
@@ -1306,6 +1418,7 @@ const pages = {
       <p class="kicker">PLANO DE ESTUDOS · semana ${S.week}</p>
       <h1 class="plan-title">PLANEJAMENTO SEMANAL</h1>
       <p class="sub">Acione manualmente ou peça às IAs.</p>
+      ${editalDiscs().length ? "" : `<p class="muted">Nenhum edital carregado. Faça o upload do edital para liberar as disciplinas.</p>`}
       <div class="row" style="margin-bottom:12px">
         <button class="btn ghost" id="wprev">Semana −</button>
         <button class="btn ghost" id="wnext">Semana +</button>
@@ -1491,7 +1604,7 @@ const pages = {
       <p class="muted room-span">Quadro oficial da prova + cada tópico do Anexo V com a nota de recorrência.</p>
       ${cards().slice(0, 8).map(([f]) => `<div class="topic"><p style="margin:0">${f}</p></div>`).join("")}
       </div>
-      <p class="muted">… e mais ${n - 8} cards.</p>
+      ${n > 8 ? `<p class="muted">… e mais ${n - 8} cards.</p>` : `<p class="muted">${n ? "" : "Nenhum edital carregado. Faça o upload do edital para liberar as disciplinas."}</p>`}
     `;
   },
   sobre() {
@@ -1519,7 +1632,8 @@ const pages = {
   },
   simulados() {
     const logs = Array.isArray(S.simLogs) ? S.simLogs : [];
-    const opts = DISC.map((d) => `<label class="sim-pill" title="${d.name}"><input type="checkbox" data-simdisc="${d.id}"><span>${d.sigla}</span></label>`).join("");
+    const pool = editalDiscs();
+    const opts = pool.length ? pool.map((d) => `<label class="sim-pill" title="${d.name}"><input type="checkbox" data-simdisc="${d.id}"><span>${d.sigla}</span></label>`).join("") : "";
     const rows = logs.map((r) => {
       const nomes = (r.discs || []).map((id) => {
         const d = DISC.find((x) => x.id === id);
@@ -1545,7 +1659,7 @@ const pages = {
           <label class="muted">Pontos <input id="simPts" type="number" min="0" value="0"></label>
           <label class="muted">Total <input id="simTot" type="number" min="0" value="0"></label>
         </div>
-        <div class="sim-pills">${opts}</div>
+        <div class="sim-pills">${opts || `<p class="muted">Nenhum edital carregado. Faça o upload do edital para liberar as disciplinas.</p>`}</div>
         <button class="btn" id="simAdd" type="button" style="margin-top:12px">Registrar simulado</button>
       </div>
       <div style="margin-top:12px">${rows || `<p class="muted">Nenhum simulado registrado.</p>`}</div>
@@ -2087,20 +2201,18 @@ document.addEventListener("change", (e) => {
   if (e.target.id === "editalFile" && e.target.files && e.target.files[0]) {
     const file = e.target.files[0];
     const reader = new FileReader();
+    const finish = (text) => {
+      const parsed = parseEditalText(text);
+      if (!parsed.discs.length && text.length < 40) return;
+      applyParsedEdital(parsed);
+      save(S);
+      page = "edital";
+      render({ force: true });
+    };
     reader.onload = () => {
-      let text = "";
       if (/\.pdf$/i.test(file.name)) {
-        const bytes = new Uint8Array(reader.result);
-        let raw = "";
-        for (let i = 0; i < bytes.length; i += 40000) {
-          raw += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(bytes.length, i + 40000)));
-        }
-        text = ((raw.match(/\((?:\\.|[^\\)]){6,}\)/g) || []).map((x) => x.slice(1, -1)).join(" ")) + " " + ((raw.match(/[A-Za-zÀ-ú0-9$/:., ]{16,}/g) || []).slice(0, 80).join(" "));
-      } else text = String(reader.result || "");
-      if (window.ATLAS && ATLAS.lerTexto(text)) {
-        save(S);
-        render({ force: true });
-      }
+        textFromPdf(reader.result).then(finish).catch(() => finish(""));
+      } else finish(String(reader.result || ""));
     };
     if (/\.pdf$/i.test(file.name)) reader.readAsArrayBuffer(file);
     else reader.readAsText(file);

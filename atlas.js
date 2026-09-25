@@ -134,6 +134,10 @@
     S.day = dayId;
     return { cid: cid, si: placed };
   }
+  function discPool() {
+    if (typeof editalDiscs === "function") return editalDiscs();
+    return [];
+  }
   function applyOps(actions) {
     var notes = [];
     (actions || []).forEach(function (a) {
@@ -143,7 +147,7 @@
         var id = resolveDiscToken(String(a.disc || ""));
         if (!day || !id || id === "sim") return;
         placeHours(day, id, a.op === "hours" ? (Number(a.horas) || 1) : null, a.op === "done" || !!a.feito);
-        var d = DISC.find(function (x) { return x.id === id; });
+        var d = discPool().find(function (x) { return x.id === id; });
         notes.push((d ? d.sigla : id) + (a.op === "done" ? " estudado" : " " + (Number(a.horas) || 1) + "h"));
       } else if (a.op === "log") {
         var qid = resolveDiscToken(String(a.disc || ""));
@@ -228,7 +232,7 @@
     t.split(/[^a-z0-9]+/).forEach(function (tok) {
       if (!tok || tok.length < 4 || stop[tok]) return;
       var id = null;
-      DISC.forEach(function (d) {
+      discPool().forEach(function (d) {
         if (id) return;
         var did = fold(d.id);
         var sg = fold(d.sigla).replace(/[^a-z0-9]+/g, "");
@@ -295,8 +299,9 @@
     return null;
   }
   function editalFala() {
-    var e = Object.assign({}, BASE, S.editalLido || {});
-    return "Cargo " + e.cargo + ". Prova " + e.prova + ". Banca " + e.banca + ". Inscrição: " + e.inscricao + ". Taxa: " + e.taxa + ".";
+    var e = S.editalLido || {};
+    if (!e.cargo && !e.banca && !e.prova) return "Nenhum edital carregado. Anexe o arquivo para eu ler as disciplinas.";
+    return "Cargo " + (e.cargo || "não informado") + ". Prova " + (e.prova || "não informada") + ". Banca " + (e.banca || "não informada") + ". Inscrição: " + (e.inscricao || "não informada") + ". Taxa: " + (e.taxa || "não informada") + ".";
   }
   function lerTexto(text) {
     var t = String(text || "").replace(/\s+/g, " ");
@@ -308,20 +313,20 @@
     var taxa = (t.match(/R\$\s*[\d.]+(?:,\d{2})?/) || [])[0];
     var link = (t.match(/https?:\/\/[^\s)]+/) || [])[0];
     S.editalLido = {
-      cargo: cargo || BASE.cargo,
-      prova: prova || BASE.prova,
-      banca: banca || BASE.banca,
-      inscricao: insc || BASE.inscricao,
-      taxa: taxa || BASE.taxa,
-      linkInscricao: link || BASE.linkInscricao,
-      linkBanca: BASE.linkBanca,
+      cargo: cargo || "",
+      prova: prova || "",
+      banca: banca || "",
+      inscricao: insc || "",
+      taxa: taxa || "",
+      linkInscricao: link || "",
+      linkBanca: "",
     };
     return S.editalLido;
   }
   function vertical() {
     var by = {};
     TOPICS.forEach(function (topic) {
-      var d = DISC.find(function (x) { return x.id === topic.d; });
+      var d = discPool().find(function (x) { return x.id === topic.d; });
       var name = d ? d.name : topic.d;
       by[name] = by[name] || [];
       by[name].push(topic.t);
@@ -434,7 +439,7 @@
     try { rec.start(); } catch (e) { speak("O microfone já está aberto."); }
   }
   function catalog() {
-    return DISC.map(function (d) { return d.id + "=" + d.name; }).join("; ");
+    return discPool().map(function (d) { return d.id + "=" + d.name; }).join("; ");
   }
   function parsePlan(text) {
     var m = String(text || "").match(/\{[\s\S]*\}/);
