@@ -472,6 +472,18 @@
     if (!m) return null;
     try { return JSON.parse(m[0]); } catch (e) { return null; }
   }
+  function humanErr(raw) {
+    var e = typeof raw === "string" ? raw : (raw && (raw.message || raw.code)) || "";
+    e = String(e);
+    if (/Incorrect API key|invalid_api_key|API key not valid|API_KEY_INVALID|invalid x-api-key/i.test(e)) return "chave recusada";
+    if (/quota|billing|insufficient_quota|credit/i.test(e)) return "conta sem crédito";
+    if (/not found|does not exist|model_not_found/i.test(e)) return "modelo indisponível";
+    if (e === "origem") return "página bloqueada";
+    if (e === "limite") return "muitas consultas, espere um minuto";
+    if (e === "pedido incompleto") return "pedido incompleto";
+    if (e === "corpo") return "pergunta grande demais";
+    return "sem resposta";
+  }
   function askModel(which, key, prompt) {
     return fetch("/api/atlas", {
       method: "POST",
@@ -480,8 +492,10 @@
     }).then(function (r) {
       return r.json().catch(function () { return { error: "resposta" }; });
     }).then(function (j) {
-      if (!j || j.error || !j.text) throw new Error("modelo");
-      return j.text;
+      var text = j && j.text ? String(j.text).trim() : "";
+      if (text) return text;
+      var err = new Error(humanErr(j && j.error));
+      throw err;
     });
   }
   function wordSet(s) {
@@ -521,11 +535,14 @@
     var prompt = "Você é a IA externa cadastrada na plataforma. Responda em português do Brasil, direto, à pergunta. Pode explicar matéria, lei e dúvida de prova. Não se apresente como Atlas. Não exija disciplina, dia ou número. Não invente número que não esteja no contexto. Pergunta: " + raw + facts;
     return Promise.all(models.map(function (m) {
       return askModel(m.which, m.key, prompt).then(function (text) {
-        return { name: m.id, text: String(text || "").trim() };
-      }).catch(function () { return { name: m.id, text: "" }; });
+        return { name: m.id, text: String(text || "").trim(), error: "" };
+      }).catch(function (e) { return { name: m.id, text: "", error: (e && e.message) || "sem resposta" }; });
     })).then(function (rows) {
       var ok = rows.filter(function (r) { return r.text; });
-      if (!ok.length) return { say: "As IAs não responderam. Confira a chave neste aparelho.", precision: 0, votes: rows.map(function (r) { return r.name; }) };
+      if (!ok.length) {
+        var who = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", copilot: "Copilot" };
+        return { say: rows.map(function (r) { return (who[r.name] || r.name) + ": " + (r.error || "sem resposta"); }).join(" · "), precision: 0, votes: rows.map(function (r) { return r.name; }) };
+      }
       if (ok.length === 1) return { say: ok[0].text, precision: 100, votes: [ok[0].name] };
       var scores = ok.map(function (r, i) {
         var s = 0;
