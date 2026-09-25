@@ -157,9 +157,10 @@
   const PIRoom = {
     messages: roomLoad(),
     paint(log) {
-      const list = this.messages.slice(-40);
+      const priv = (typeof S !== "undefined" && S && S.atlasLog) ? S.atlasLog : [];
+      const list = this.messages.slice(-30).concat(priv).sort((a, b) => (a.ts || 0) - (b.ts || 0)).slice(-40);
       const sig = list.length
-        ? list.map((m) => (m.id || "") + "|" + (m.ts || "") + "|" + (m.text || "")).join("\n")
+        ? list.map((m) => (m.id || "") + "|" + (m.ts || "") + "|" + (m.text || "") + "|" + (m.priv ? "p" : "")).join("\n")
         : "empty";
       if (log.dataset.sig === sig) return;
       log.dataset.sig = sig;
@@ -169,9 +170,10 @@
         const uid = S && S.me && S.me.id;
         log.innerHTML = list.map((m) => {
           const mine = m.uid === uid;
+          const who = m.priv && m.uid !== "atlas" ? "só você" : (m.name || "aluno");
           const audio = m.audio && String(m.audio).indexOf("data:audio/") === 0
             ? `<audio controls src="${esc(m.audio)}"></audio>` : "";
-          return `<div class="dock-msg ${mine ? "me" : "them"}"><span class="who">${esc(m.name || "aluno")}</span>${esc(m.text || "")}${audio}</div>`;
+          return `<div class="dock-msg ${mine ? "me" : "them"}${m.priv ? " private" : ""}"><span class="who">${esc(who)}</span>${esc(m.text || "")}${audio}</div>`;
         }).join("");
       }
       log.scrollTop = log.scrollHeight;

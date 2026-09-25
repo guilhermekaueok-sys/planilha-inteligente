@@ -751,6 +751,10 @@ function applyChatPlan(raw) {
   const text = String(raw || "").trim();
   const t = foldTxt(text);
   if (!t) return null;
+  if (window.ATLAS && ATLAS.exec) {
+    const hit = ATLAS.exec(text);
+    if (hit) return hit;
+  }
   if (/^(ajuda|help|\?|comandos)$/.test(t)) {
     return "Comandos: segunda port infor rlm · meta 2 ciclo 3 slot 1 penal · q port 20 15 · semana 2 · automatico · manual · reorganizar";
   }
@@ -802,28 +806,33 @@ function applyChatPlan(raw) {
   }
   return null;
 }
-function sendPlanChat(inp) {
+function sendPlanChat(inp, opt) {
   if (!inp || !inp.value.trim()) return;
   const pal = S.chatWith || S.me.id;
   S.chats[pal] = S.chats[pal] || [];
   const text = inp.value.trim();
   const ts = Date.now();
-  S.chats[pal].push({ from: "me", text, ts });
-  S.chatWith = pal;
   inp.value = "";
-  if (window.PIRoom) PIRoom.postText(text);
   const reply = applyChatPlan(text);
   if (reply) {
-    S.chats[pal].push({ from: "them", text: reply, ts: ts + 1 });
-    if (window.PIRoom) PIRoom.note(reply);
+    S.atlasLog = S.atlasLog || [];
+    S.atlasLog.push({ id: "a" + ts, uid: S.me.id, name: S.me.name || "você", text: text, ts: ts, priv: true });
+    S.atlasLog.push({ id: "a" + (ts + 1), uid: "atlas", name: "ATLAS", text: reply, ts: ts + 1, priv: true });
+    if (S.atlasLog.length > 40) S.atlasLog = S.atlasLog.slice(-40);
+    S.chats[pal].push({ from: "me", text: text, ts: ts, priv: true });
+    S.chats[pal].push({ from: "atlas", text: reply, ts: ts + 1, priv: true });
     save(S);
     render({ force: true });
-  } else {
-    save(S);
-    pump({ chat: { fromId: S.me.id, text, ts } });
-    paintDock();
-    if (page === "chat") render();
+    if (window.ATLAS && opt && opt.voice) ATLAS.speak(reply);
+    return;
   }
+  S.chats[pal].push({ from: "me", text: text, ts: ts });
+  S.chatWith = pal;
+  if (window.PIRoom) PIRoom.postText(text);
+  save(S);
+  pump({ chat: { fromId: S.me.id, text: text, ts: ts } });
+  paintDock();
+  if (page === "chat") render();
 }
 
 function sheetTotals() {
@@ -947,7 +956,8 @@ const pages = {
       const xs = DISC.map((d) => rate(d.id)).filter((x) => x !== null);
       return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
     })();
-    const pct = avg == null ? 0 : Math.round(avg * 100);
+    const pulse = window.ATLAS ? ATLAS.pulse() : null;
+    const pct = pulse ? pulse.geral : (avg == null ? 0 : Math.round(avg * 100));
     const port = rate("port");
     const dirIds = ["const", "admin", "penal", "proc", "estat"];
     const dirXs = dirIds.map(rate).filter((x) => x !== null);
@@ -956,7 +966,7 @@ const pages = {
     const peso = Math.round(importance(top) * 100);
     return `
       <div class="hero-title">
-        <h1>Desempenho Geral</h1>
+        <h1>DESEMPENHO GERAL</h1>
         <p class="muted">Overall Performance · Nísia 2026 · semana ${S.week}</p>
       </div>
       <div class="dash-hero">
@@ -981,12 +991,13 @@ const pages = {
           </div>
         </div>
         <div class="card copilot">
-          <p class="copilot-lead">Use a IA para facilitar seu manuseio.</p>
-          <h2>IA Copilot: otimizando seu plano</h2>
+          <div class="atlas-orb" aria-hidden="true"></div>
+          <p class="copilot-lead">Comando fica só com você. A turma não vê.</p>
+          <h2>ATLAS</h2>
           <div class="wave">${"<i></i>".repeat(18)}</div>
           <button class="voice-btn" id="voiceAsk" type="button">
             <strong>${userName() || "Seu nome"}</strong>
-            <span>Peça por comando de voz.</span>
+            <span>Peça por voz. Ex.: Atlas, adicione 2 horas de Direito Administrativo na terça.</span>
           </button>
         </div>
         <div class="card">
@@ -1009,8 +1020,8 @@ const pages = {
   },
   desempenho() {
     return `
-      <p class="kicker">Desempenho</p>
-      <h1>Acerto por disciplina</h1>
+      <p class="kicker">HISTÓRICO DE DESEMPENHO DA JORNADA</p>
+      <h1>HISTÓRICO DE DESEMPENHO DA JORNADA</h1>
       <p class="sub">Cada barra é o seu acerto. Sem lançamento, fica sem dados.</p>
       <div class="disc-board">
       ${DISC.map((d) => {
@@ -1031,8 +1042,10 @@ const pages = {
   },
   radar() {
     return `
-      <p class="kicker">Radar</p>
-      <h1>Importância × peso da prova</h1>
+      <p class="kicker">RADAR DE CONCURSOS · 25/09/2026</p>
+      <h1>RADAR DE CONCURSOS</h1>
+      <p class="sub">Editais abertos, previstos e banca já definida. A barra abaixo continua sendo o peso da sua prova.</p>
+      <div class="disc-board" style="margin-bottom:12px">${window.ATLAS ? ATLAS.radarHtml() : ""}</div>
       <p class="sub">Barra mint = importância na prova. O texto à direita é o peso oficial, não o seu acerto.</p>
       <div class="disc-board">
       ${[...DISC].sort((a,b)=>importance(b)-importance(a)).map((d) => {
@@ -1051,8 +1064,17 @@ const pages = {
   edital() {
     return `
       ${cover("edital")}
-      <p class="kicker">Edital 02/2026</p>
-      <h1>O que está no programa e o que já caiu fora.</h1>
+      <p class="kicker">EDITAL</p>
+      <h1>EDITAL</h1>
+      <div class="card">${window.ATLAS ? ATLAS.card() : ""}
+        <label class="muted" style="display:block;margin-top:8px">Anexar edital (PDF ou texto)
+          <input id="editalFile" type="file" accept=".pdf,.txt,.text,text/plain,application/pdf">
+        </label>
+      </div>
+      <h2>EDITAL VERTICALIZADO</h2>
+      <div class="room-view room-edital">
+      ${window.ATLAS ? Object.entries(ATLAS.vertical()).map(([disc, assuntos]) => `<div class="topic"><strong>${disc}</strong><ul>${assuntos.map((a) => `<li>${a}</li>`).join("")}</ul></div>`).join("") : ""}
+      </div>
       <p class="sub">Amostra: 9 editais recentes de Guarda (Mauá, Tamandaré, Piumhi, Santa Maria de Jetibá, Nísia Floresta, Caldas Novas, Curitiba, Benevides, Santana do Mundaú) + padrão de prefeituras.</p>
       <div class="room-view room-edital">
       ${TOPICS.sort((a,b)=>b.rec-a.rec).map((t) => {
@@ -1080,8 +1102,8 @@ const pages = {
     const day = DAYS.find((d) => d.id === S.day) || DAYS[0];
     const list = discsPlanned(day.id);
     return `
-      <p class="kicker">Questões · ${day.label} · semana ${S.week}</p>
-      <h1>Só o que caiu neste dia.</h1>
+      <p class="kicker">REGISTRO DE QUES. PARA ACOMPANHAMENTO DE EVOLUÇÃO</p>
+      <h1>REGISTRO DE QUES. PARA ACOMPANHAMENTO DE EVOLUÇÃO</h1>
       <p class="sub">As disciplinas vêm do Plano de Estudos. Resolvidas e acertos entram por matéria do dia.</p>
       <div class="row" style="margin-bottom:12px">
         <label class="muted">Dia
@@ -1130,7 +1152,7 @@ const pages = {
       </td>`;
     };
     return `
-      <p class="kicker">Plano de Estudos · semana ${S.week}</p>
+      <p class="kicker">PLANO DE ESTUDOS · semana ${S.week}</p>
       <h1 class="plan-title">PLANEJAMENTO SEMANAL</h1>
       <p class="sub">Acione manualmente ou peça ao Atlas.</p>
       <div class="row" style="margin-bottom:12px">
@@ -1322,16 +1344,28 @@ const pages = {
     `;
   },
   sobre() {
+    const a = window.ATLAS ? ATLAS.prefs() : { simpatia: 2, interacao: 2, criatividade: 1, poder: 2 };
+    const p = window.ATLAS ? ATLAS.pulse() : { geral: 0, qScore: 0, hScore: 0, dScore: 0 };
+    const slider = (id, lab, v) => `<label class="muted">${lab} <input id="${id}" type="range" min="0" max="3" value="${v}"> <b>${v}</b></label>`;
     return `
-      ${cover("edital")}
-      <p class="kicker">Método</p>
-      <h1>Como o nível é calculado</h1>
-      <p class="sub">Nada aqui substitui o PDF oficial. Os pontos da prova vêm do Edital 02/2026. A recorrência vem de amostra pública de 9 editais de Guarda (2025–2026) e do padrão que se repete em prefeituras.</p>
+      <p class="kicker">ATLAS</p>
+      <h1>ATLAS</h1>
+      <p class="sub">Mentor da planilha. Texto ou voz. O que for comando não entra na Turma ao vivo.</p>
+      <div class="card">
+        <div class="atlas-orb" aria-hidden="true"></div>
+        <p>Desempenho geral agora: <strong>${p.geral}%</strong>. Questões ${p.qScore}% · horas ${p.hScore}% · disciplinas ${p.dScore}%.</p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="voiceAsk" type="button">Falar com o ATLAS</button>
+        </div>
+        ${slider("atlasSim", "Simpatia", a.simpatia)}
+        ${slider("atlasInt", "Interação", a.interacao)}
+        ${slider("atlasCri", "Criatividade", a.criatividade)}
+        ${slider("atlasPod", "Poder de acesso", a.poder)}
+        <p class="muted">Poder 2 lança hora, questão e disciplina. Abaixo disso o ATLAS só orienta.</p>
+      </div>
       <div class="card">
         <p><strong>Importância</strong> = 65% pontos oficiais (em 90) + 25% presença no edital da amostra + 10% “já caiu em prova”.</p>
-        <p><strong>Nível</strong> = acertos ÷ questões lançadas. Sem dado = não inventa nota.</p>
-        <p><strong>Fila</strong> = importância × (1 − desempenho). Alto peso + acerto baixo sobe.</p>
-        <p class="muted">Direito e legislação valem 60 de 90 pontos neste edital. Por isso o radar fatia o bloco de 30 questões em temas que o Anexo V e as provas de GM realmente repetem: art. 144, 13.022, penal da Administração, flagrante, Maria da Penha, município.</p>
+        <p><strong>Desempenho geral</strong> = 50% acerto nas questões + 30% horas batidas na meta da semana + 20% disciplinas marcadas como estudadas. Sem dado, o peso sai da média.</p>
       </div>
     `;
   },
@@ -1353,8 +1387,8 @@ const pages = {
       </div>`;
     }).join("");
     return `
-      <p class="kicker">Simulados</p>
-      <h1>Registros de simulados</h1>
+      <p class="kicker">SIMULADOS</p>
+      <h1>SIMULADOS</h1>
       <p class="sub">Pontuação e disciplinas de cada simulado feito. Esta sala não abre o plano de estudos.</p>
       <div class="card">
         <div class="row">
@@ -1731,6 +1765,9 @@ document.addEventListener("click", (e) => {
       msg.textContent = "Não deu para ler o código. Peça um VG1. novo.";
     }
   }
+  if (e.target.id === "voiceAsk" || (e.target.closest && e.target.closest("#voiceAsk"))) {
+    if (window.ATLAS) ATLAS.listen();
+  }
   if (e.target.id === "chatSend" || e.target.id === "dockSend") {
     const pal = S.chatWith || S.me.id;
     const inp = e.target.id === "dockSend" ? $("dockIn") : $("chatIn");
@@ -1794,6 +1831,15 @@ document.addEventListener("keydown", (e) => {
   }
 });
 document.addEventListener("input", (e) => {
+  const atlasKey = { atlasSim: "simpatia", atlasInt: "interacao", atlasCri: "criatividade", atlasPod: "poder" }[e.target.id];
+  if (atlasKey) {
+    if (!S.atlas) S.atlas = { simpatia: 2, interacao: 2, criatividade: 1, poder: 2 };
+    S.atlas[atlasKey] = Number(e.target.value);
+    const b = e.target.parentElement && e.target.parentElement.querySelector("b");
+    if (b) b.textContent = e.target.value;
+    save(S, true);
+    return;
+  }
   captureField(e.target);
   save(S, true);
   if (e.target.dataset && e.target.dataset.sheet) paintSheetTotals();
@@ -1819,6 +1865,29 @@ document.addEventListener("change", (e) => {
       img.src = String(reader.result || "");
     };
     reader.readAsDataURL(file);
+    e.target.value = "";
+    return;
+  }
+  if (e.target.id === "editalFile" && e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      let text = "";
+      if (/\.pdf$/i.test(file.name)) {
+        const bytes = new Uint8Array(reader.result);
+        let raw = "";
+        for (let i = 0; i < bytes.length; i += 40000) {
+          raw += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(bytes.length, i + 40000)));
+        }
+        text = ((raw.match(/\((?:\\.|[^\\)]){6,}\)/g) || []).map((x) => x.slice(1, -1)).join(" ")) + " " + ((raw.match(/[A-Za-zÀ-ú0-9$/:., ]{16,}/g) || []).slice(0, 80).join(" "));
+      } else text = String(reader.result || "");
+      if (window.ATLAS && ATLAS.lerTexto(text)) {
+        save(S);
+        render({ force: true });
+      }
+    };
+    if (/\.pdf$/i.test(file.name)) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
     e.target.value = "";
     return;
   }
