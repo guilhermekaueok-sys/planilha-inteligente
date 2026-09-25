@@ -7,7 +7,7 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-pi.svg" />
-  <link rel="stylesheet" href="./styles.css?v=15" />
+  <link rel="stylesheet" href="./styles.css?v=16" />
 </head>
 <body>
   <div id="chrome-only" hidden>
@@ -73,16 +73,20 @@
       </nav>
       <button type="button" id="logoutBtn" class="logout-btn" title="Sair"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6H6.5A1.5 1.5 0 0 0 5 7.5v9A1.5 1.5 0 0 0 6.5 18H9M10 12h9M15 8l4 4-4 4"/></svg></i><span class="nav-label">Sair</span></button>
       <div class="side-tools">
-        <div class="zoom-box">
+        <button type="button" id="eyeFit" class="eye-fit" title="Fonte e visual" aria-expanded="false" aria-label="Fonte e visual">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6.5 6.5 12 6.5 21.5 12 21.5 12 17.5 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg>
+        </button>
+        <button type="button" id="backupBtn" class="backup-btn" title="Backup" aria-label="Backup">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5h7l3 3V19a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1z"/><path d="M14 4.5V8h3M8 13h8M8 16h5"/></svg>
+        </button>
+        <div class="zoom-box zoom-pop" id="zoomPop" hidden>
           <button type="button" data-zoom="-">A−</button>
           <span class="muted" id="zoomLbl">100%</span>
           <button type="button" data-zoom="+">A+</button>
           <button type="button" data-view="barras" title="Barras">Barras</button>
           <button type="button" data-view="blocos" title="Blocos">Blocos</button>
         </div>
-        <button type="button" id="backupBtn" class="backup-btn" title="Backup de segurança">
-          <span class="nav-label">Backup</span>
-        </button>
+        <div class="backup-float" id="backupFloat" hidden>Backup</div>
       </div>
     </aside>
     <main class="main" id="view"></main>
@@ -125,7 +129,7 @@
   <script src="./engine.js"></script>
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
-  <script src="./app.js?v=15"></script>
+  <script src="./app.js?v=16"></script>
   <script src="./session.js?v=14"></script>
 </body>
 </html>

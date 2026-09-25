@@ -1323,6 +1323,12 @@ function rowDisc(d) {
 }
 
 document.addEventListener("click", (e) => {
+  if (!e.target.closest(".side-tools")) {
+    const pop = $("zoomPop");
+    if (pop) pop.hidden = true;
+    const eye = $("eyeFit");
+    if (eye) eye.setAttribute("aria-expanded", "false");
+  }
   const nav = e.target.closest("[data-nav]");
   if (nav) { page = nav.dataset.nav; $("side").classList.remove("open"); render(); }
   const go = e.target.closest("[data-go]");
@@ -1367,7 +1373,26 @@ document.addEventListener("click", (e) => {
     render({ force: true });
     return;
   }
-  if (e.target.id === "backupBtn") {
+  if (e.target.closest("#eyeFit")) {
+    const pop = $("zoomPop");
+    if (!pop) return;
+    pop.hidden = !pop.hidden;
+    e.target.closest("#eyeFit").setAttribute("aria-expanded", pop.hidden ? "false" : "true");
+    const bf = $("backupFloat");
+    if (bf) bf.hidden = true;
+    return;
+  }
+  if (e.target.closest("#backupBtn")) {
+    const pop = $("zoomPop");
+    if (pop) pop.hidden = true;
+    const eye = $("eyeFit");
+    if (eye) eye.setAttribute("aria-expanded", "false");
+    const bf = $("backupFloat");
+    if (bf) {
+      bf.hidden = false;
+      clearTimeout(window.__piBackupT);
+      window.__piBackupT = setTimeout(() => { bf.hidden = true; }, 2200);
+    }
     sendBackup();
     return;
   }
