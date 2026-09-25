@@ -1,0 +1,31 @@
+Planilha Inteligente — núcleo + projetos
+
+Render da planilha
+- Enquanto você digita numa célula, a tabela não é remontada.
+- Só o rodapé (totais) atualiza. Foco e texto permanecem.
+- Nova linha, limpar, preencher e apagar linha remontam de propósito.
+
+Novos projetos
+1. Copie projetos/modelo.js
+2. Dê um id novo e registre com PI.register({ ... })
+3. Inclua o arquivo no index.html depois de engine.js
+4. Salas extras entram em extraPages. O menu lateral não cresce sozinho.
+
+Render virtual (engine.js)
+- Janela: só linhas visíveis + 3 de folga.
+- Reciclo: o tbody pinta a fatia, não a grade inteira.
+- rAF: o scroll agenda uma pintura por frame.
+- Patch: com foco na célula, a janela não pinta.
+
+Memória
+- Gravacão em lote (280 ms). Fechar a aba ainda descarrega na hora.
+- Uma conexão IndexedDB reaproveitada.
+- Chat ≤ 80 msgs/thread, amigos ≤ 40, logs ≤ 400.
+- Blob de download é revogado.
+
+Dados
+- Cada login grava o próprio estado (localStorage + IndexedDB). Um usuário não abre a planilha do outro.
+- Até 15 contas. Sem as chaves em firebase-config.js, o cadastro fica neste aparelho.
+- Com as chaves, o login usa o JWT do Firebase Auth e o Firestore guarda estado, presença e a sala.
+- Publique firestore.rules no console do Firebase.
+

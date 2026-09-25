@@ -1,3 +1,4 @@
+/* Overlay JARVIS: troca o Início antigo pelo anel/desempenho. */
 (function () {
   if (typeof pages === "undefined") return;
   pages.comando = function () {
@@ -26,9 +27,9 @@
       "<div><b>" + dir + '%</b><span class="muted">Direito</span></div>' +
       "<div><b>" + (port == null ? 0 : Math.round(port * 100)) + '%</b><span class="muted">Português</span></div>' +
       '<div class="onair"><b>' + (liveStatus === "on" ? "on" : "24%") + '</b><span class="muted">Online</span></div></div></div>' +
-      '<div class="card copilot"><div class="muted">MÉTODO · SEMANA ' + S.week + "</div>" +
-      '<h2>IA Copilot: otimizando seu plano</h2><div class="wave">' + "<i></i>".repeat(18) + "</div>" +
-      '<p class="muted">' + nome + ", o que falta, no que pesa.</p></div>" +
+      '<div class="card copilot"><p class="copilot-lead">Use a IA para facilitar seu manuseio.</p>' +
+      "<h2>IA Copilot: otimizando seu plano</h2><div class=\"wave\">" + "<i></i>".repeat(18) + "</div>" +
+      '<button class="voice-btn" id="voiceAsk" type="button"><strong>' + nome + "</strong><span>Peça por comando de voz.</span></button></div>" +
       '<div class="card"><div class="muted">GRAU DE DISCIPLINAS</div>' +
       '<div class="disc-line"><span>Português</span><div class="bar cyan"><i style="width:' + (port == null ? 8 : Math.round(port * 100)) + '%"></i></div></div>' +
       '<div class="disc-line"><span>Direito</span><div class="bar blue"><i style="width:' + (dir || 8) + '%"></i></div></div>' +

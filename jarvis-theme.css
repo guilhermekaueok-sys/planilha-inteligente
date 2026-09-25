@@ -48,7 +48,7 @@ body {
 .stars b { display: block; color: var(--mint); }
 .disc-line { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; margin-top: 10px; }
 .bar { height: 8px; background: #0a1220; border-radius: 99px; overflow: hidden; }
-.bar > i { display: block; height: 100%; background: linear-gradient(90deg, #1bb8d9, #7b6cff); transform-origin: left center; animation: fillBar .7s ease both; }
+.bar > i { display: block; height: 100%; background: linear-gradient(90deg, #1bb8d9, #7b6cff); }
 .bar.cyan > i { background: linear-gradient(90deg, #1bb8d9, #7af6ff); }
 .bar.blue > i { background: linear-gradient(90deg, #3b6cff, #7ab0ff); }
 .bar.violet > i { background: linear-gradient(90deg, #6a4dff, #c09bff); }
@@ -57,7 +57,6 @@ body {
   display: grid; place-items: center;
   background: conic-gradient(#3ce6ff var(--p, 0%), rgba(60,230,255,.12) 0);
   box-shadow: 0 0 40px rgba(60,230,255,.2);
-  animation: pulseGlow 2.8s ease-in-out infinite;
 }
 .ring > span {
   width: 150px; height: 150px; border-radius: 50%; background: #07101c;
@@ -68,6 +67,8 @@ body {
 .wave i:nth-child(3n) { height: 40px; animation-delay: .3s; }
 .wave i:nth-child(3n+1) { height: 18px; }
 .wave i:nth-child(3n+2) { height: 28px; animation-delay: .15s; }
+.ring { animation: pulseGlow 2.8s ease-in-out infinite; }
+.bar > i { transform-origin: left center; animation: fillBar .7s ease both; }
 .main > .card, .hero-title { animation: rise .45s ease both; }
 @keyframes wave { 50% { transform: scaleY(.35); opacity: .6; } }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

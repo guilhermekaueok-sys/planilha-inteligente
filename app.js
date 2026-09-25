@@ -46,6 +46,8 @@ const TOPICS = [
 
 const defaultState = () => ({
   week: 1,
+  day: "seg",
+  planMode: "auto",
   logs: {},
   topic: {},
   me: {
@@ -54,6 +56,7 @@ const defaultState = () => ({
     handle: "",
     city: "Natal / Nísia Floresta",
     exam: "GCM Nísia Floresta · IDIB",
+    email: "",
   },
   friends: {},
   chats: {},
@@ -66,6 +69,7 @@ const defaultState = () => ({
   tourStep: 0,
   tourDone: false,
   zoom: 1,
+  viewMode: "barras",
   sheet: null,
 });
 
@@ -80,7 +84,8 @@ let liveStatus = "off";
 const DISK = "planilha-inteligente";
 
 function openDisk() {
-  return new Promise((resolve, reject) => {
+  if (window.PI && PI.mem.db) return PI.mem.db;
+  const p = new Promise((resolve, reject) => {
     const req = indexedDB.open(DISK, 1);
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains("kv")) req.result.createObjectStore("kv");
@@ -88,39 +93,110 @@ function openDisk() {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+  if (window.PI) PI.mem.db = p;
+  return p;
+}
+
+function diskKey() {
+  if (S && S.entered && S.me && S.me.id) return "state-" + S.me.id;
+  return "state";
 }
 
 function mirrorDisk(raw, savedAt) {
   openDisk().then((db) => {
     const tx = db.transaction("kv", "readwrite");
-    tx.objectStore("kv").put({ raw, savedAt }, "state");
+    tx.objectStore("kv").put({ raw, savedAt }, diskKey());
   }).catch(() => {});
 }
 
 function readDisk() {
   return openDisk().then((db) => new Promise((resolve) => {
-    const g = db.transaction("kv", "readonly").objectStore("kv").get("state");
+    const g = db.transaction("kv", "readonly").objectStore("kv").get(diskKey());
     g.onsuccess = () => resolve(g.result || null);
     g.onerror = () => resolve(null);
   })).catch(() => null);
 }
 
-function save(s, silent) {
+function stateBucket() {
+  if (S && S.entered && S.me && S.me.id) return "pi-state-v7-" + S.me.id;
+  return KEY;
+}
+
+function commitSave(s) {
+  if (window.PI) PI.mem.prune(s);
   s.savedAt = Date.now();
   let raw = "";
   try {
     raw = JSON.stringify(s);
-    localStorage.setItem(KEY, raw);
+    localStorage.setItem(stateBucket(), raw);
   } catch (_) {}
   if (raw) mirrorDisk(raw, s.savedAt);
+  if (window.PISession && PISession.pushState) PISession.pushState(s);
+}
+
+function sendBackup() {
+  commitSave(S);
+  const payload = {
+    kind: "pi-backup",
+    url: location.href,
+    savedAt: S.savedAt,
+    state: S,
+  };
+  const raw = JSON.stringify(payload);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const name = "planilha-backup-" + stamp + ".json";
+  const blob = new Blob([raw], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  const mail = ((S.me && S.me.email) || "").trim();
+  const lbl = $("fileLbl");
+  const head = "Endereço da plataforma: " + location.href + "\n\nEstado no momento do backup:\n";
+  const body = head + raw;
+  if (!mail) {
+    if (lbl) lbl.textContent = "Backup baixado. Preencha o e-mail para enviar.";
+    return;
+  }
+  const use = body.length < 1500 ? body : head + "Arquivo " + name + " (anexe o arquivo que acabou de baixar).";
+  location.href = "mailto:" + encodeURIComponent(mail) + "?subject=" + encodeURIComponent("Backup de segurança · Planilha Inteligente") + "&body=" + encodeURIComponent(use);
+  if (lbl) lbl.textContent = body.length < 1500 ? "E-mail de backup aberto" : "E-mail aberto. Anexe o arquivo baixado.";
+}
+
+function restoreBackup(text, fileName) {
+  let data = null;
+  try { data = JSON.parse(text); } catch (_) {}
+  const state = data && data.kind === "pi-backup" && data.state;
+  const lbl = $("fileLbl");
+  if (!state || typeof state !== "object") {
+    if (lbl) lbl.textContent = fileName || "Nenhum ficheiro selecionado";
+    return;
+  }
+  S = Object.assign(defaultState(), state);
+  commitSave(S);
+  render({ force: true });
+  if (lbl) lbl.textContent = "Backup restaurado";
+}
+
+function save(s, silent) {
+  s.savedAt = Date.now();
+  if (window.PI) {
+    clearTimeout(PI.mem.timer);
+    PI.mem.timer = setTimeout(() => commitSave(s), 280);
+  } else {
+    commitSave(s);
+  }
   if (!silent) pump();
 }
 
 function captureField(el) {
   if (!el || !S) return;
-  if (el.id === "meName" || el.id === "gateName") S.me.name = el.value;
+  if (el.id === "meName" || el.id === "gateName" || el.id === "topName") S.me.name = el.value;
+  if (el.id === "topEmail") S.me.email = el.value;
   if (el.id === "meHandle") S.me.handle = String(el.value || "").replace(/\s/g, "");
   if (el.id === "weekIn") S.week = Math.min(14, Math.max(1, Number(el.value) || 1));
+  if (el.id === "dayIn") S.day = el.value;
   if (el.dataset && el.dataset.topic) S.topic[el.dataset.topic] = el.value;
   if (el.dataset && el.dataset.sheet && S.sheet) {
     const row = S.sheet.rows.find((r) => r.id === el.dataset.row);
@@ -130,6 +206,17 @@ function captureField(el) {
         row.cells[el.dataset.day] = row.cells[el.dataset.day] || blankCell();
         row.cells[el.dataset.day][el.dataset.sheet] = el.value;
       }
+    }
+  }
+  if (el.dataset && el.dataset.board && S.board) {
+    const mi = Number(el.dataset.meta);
+    const si = Number(el.dataset.slot);
+    const cid = el.dataset.ciclo;
+    const slot = S.board[mi] && S.board[mi].slots[si];
+    if (slot) {
+      slot[cid] = slot[cid] || blankCell();
+      slot[cid][el.dataset.board] = el.value;
+      S.planMode = "manual";
     }
   }
   if (el.dataset && (el.dataset.q || el.dataset.h)) {
@@ -144,7 +231,8 @@ function captureField(el) {
 
 function flushNow() {
   captureField(document.activeElement);
-  save(S, true);
+  if (window.PI) clearTimeout(PI.mem.timer);
+  commitSave(S);
 }
 
 function pump(extra) {
@@ -235,7 +323,89 @@ const DAYS = [
   { id: "sab", label: "Sáb" },
   { id: "dom", label: "Dom" },
 ];
-function blankCell() { return { disc: "", horas: "", ques: "", nota: "" }; }
+const CICLOS = [
+  { id: "i", label: "CICLO I", day: "seg" },
+  { id: "ii", label: "CICLO II", day: "ter" },
+  { id: "iii", label: "CICLO III", day: "qua" },
+  { id: "iv", label: "CICLO IV", day: "qui" },
+  { id: "v", label: "CICLO V", day: "sex" },
+  { id: "vi", label: "CICLO VI", day: "sab" },
+  { id: "vii", label: "CICLO VII", day: "dom", simulado: true },
+];
+function blankCell() { return { disc: "", horas: "1", ques: "", nota: "" }; }
+function emptyBoard() {
+  return [1, 2, 3, 4].map((n) => ({
+    id: "meta" + n,
+    label: "META",
+    slots: [0, 1, 2].map(() => Object.fromEntries(CICLOS.map((c) => [c.id, blankCell()]))),
+  }));
+}
+function cicloOfDay(dayId) {
+  const found = CICLOS.find((c) => c.day === dayId);
+  return found ? found.id : "i";
+}
+function boardCell(meta, slot, ciclo) {
+  const b = S.board && S.board[meta] && S.board[meta].slots[slot];
+  return (b && b[ciclo]) || blankCell();
+}
+function discOpts(sel) {
+  return [{ id: "", sigla: "—" }, { id: "sim", sigla: "Simulado" }, ...DISC]
+    .map((o) => `<option value="${o.id}" ${o.id === sel ? "selected" : ""}>${o.sigla}</option>`).join("");
+}
+function todayDayId() {
+  return ["dom", "seg", "ter", "qua", "qui", "sex", "sab"][new Date().getDay()];
+}
+function discsPlanned(dayId) {
+  const seen = [];
+  const cid = cicloOfDay(dayId);
+  const board = S.board || [];
+  board.forEach((meta) => {
+    (meta.slots || []).forEach((slot) => {
+      const id = slot[cid] && slot[cid].disc;
+      if (id && id !== "sim" && seen.indexOf(id) === -1) seen.push(id);
+    });
+  });
+  if (!seen.length) {
+    const rows = (S.sheet && S.sheet.rows) || [];
+    rows.forEach((row) => {
+      const id = row.cells && row.cells[dayId] && row.cells[dayId].disc;
+      if (id && id !== "sim" && seen.indexOf(id) === -1) seen.push(id);
+    });
+  }
+  return seen.map((id) => DISC.find((d) => d.id === id)).filter(Boolean);
+}
+function planHasDiscs() {
+  return DAYS.some((d) => discsPlanned(d.id).length);
+}
+function seedBoard() {
+  const bag = [];
+  DISC.forEach((d) => {
+    const w = Math.max(1, Math.round(importance(d) * 10));
+    for (let i = 0; i < w; i++) bag.push(d.id);
+  });
+  const board = emptyBoard();
+  board.forEach((meta, mi) => {
+    CICLOS.forEach((c, ci) => {
+      meta.slots.forEach((slot, si) => {
+        if (c.simulado) {
+          slot[c.id] = { disc: "sim", horas: "2", ques: si === 0 ? "60" : "", nota: "Simulado" };
+          return;
+        }
+        const ticket = ((S.week - 1) * 21 + mi * 7 + ci * 3 + si) % bag.length;
+        slot[c.id] = { disc: bag[ticket], horas: "1", ques: "", nota: "" };
+      });
+    });
+  });
+  return board;
+}
+function ensurePlan() {
+  if (!S.sheet || !S.sheet.rows) S.sheet = emptySheet();
+  if (!S.board || !S.board.length) S.board = emptyBoard();
+}
+function rotatePlan() {
+  S.board = seedBoard();
+  save(S);
+}
 function emptySheet() {
   const rows = ["CICLO I", "CICLO II", "CICLO III", "CICLO IV", "CICLO V", "CICLO VI", "CICLO VII · simulado"].map((label, i) => ({
     id: "r" + (i + 1),
@@ -279,7 +449,7 @@ function sheetCsv() {
   return lines.join("\n");
 }
 
-let S = load();
+var S = load();
 S.me = { ...defaultState().me, ...(S.me || {}) };
 if (!S.friends) S.friends = {};
 if (!S.chats) S.chats = {};
@@ -287,7 +457,11 @@ if (!S.room) S.room = "";
 if (!S.masterUrl) S.masterUrl = defaultState().masterUrl;
 if (!S.avatar) S.avatar = "lia";
 if (S.zoom == null) S.zoom = 1;
+if (S.viewMode !== "blocos") S.viewMode = "barras";
 if (!S.sheet) S.sheet = emptySheet();
+if (!S.day) S.day = todayDayId();
+if (!S.planMode) S.planMode = "auto";
+if (!S.board || !S.board.length) S.board = emptyBoard();
 let page = "comando";
 const TOUR = [
   { page: "comando", text: "Aqui é o Comando. A fila sobe o que pesa na prova e ainda está fraco no seu acerto." },
@@ -305,6 +479,13 @@ function applyZoom() {
   const lbl = $("zoomLbl");
   if (lbl) lbl.textContent = Math.round(z * 100) + "%";
 }
+function applyView() {
+  const mode = S.viewMode === "blocos" ? "blocos" : "barras";
+  S.viewMode = mode;
+  document.body.classList.toggle("view-blocos", mode === "blocos");
+  document.body.classList.toggle("view-barras", mode !== "blocos");
+  document.querySelectorAll("[data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === mode));
+}
 function avatarSrc() {
   return S.avatar === "nilo" ? "./avatares/nilo.svg" : "./avatares/lia.svg";
 }
@@ -321,7 +502,8 @@ function say(text) {
 function paintGate() {
   const gate = $("gate");
   if (!gate) return;
-  gate.hidden = !!S.entered;
+  const ok = !!(S.entered && S.me && S.me.email);
+  gate.hidden = ok;
   const inp = $("gateName");
   if (inp && !inp.value && userName()) inp.value = userName();
   document.querySelectorAll("[data-avatar]").forEach((b) => {
@@ -450,9 +632,11 @@ function tsvOf() {
 function downloadTsv() {
   const blob = new Blob([tsvOf()], { type: "text/tab-separated-values;charset=utf-8" });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = "anki-vigilia-gcm.txt";
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function cover() {
@@ -461,17 +645,232 @@ function cover() {
 
 function $(id) { return document.getElementById(id); }
 
-function render() {
-  paintGate();
-  paintTour();
-  applyZoom();
-  if (!pages[page]) page = "comando";
-  $("view").innerHTML = pages[page]();
-  document.querySelectorAll("[data-nav]").forEach((b) => {
-    b.classList.toggle("on", b.dataset.nav === page);
+function paintDock() {
+  const log = $("dockLog");
+  if (!log) return;
+  if (window.PIRoom) {
+    PIRoom.paint(log);
+    return;
+  }
+  const pal = S.chatWith;
+  const thread = (pal && S.chats[pal]) || [];
+  const fallback = thread.length ? thread.slice(-16) : [{ from: "them", text: "Chat ligado à planilha. Ex.: segunda port infor rlm · q port 20 15 · ajuda" }];
+  log.innerHTML = fallback.map((m) => `<div class="dock-msg ${m.from}">${m.text}</div>`).join("");
+  log.scrollTop = log.scrollHeight;
+}
+function foldTxt(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function resolveDiscToken(token) {
+  const t = foldTxt(token).replace(/[^a-z0-9.]+/g, "");
+  if (!t) return null;
+  if (/^simu?l?a?d?o?$/.test(t) || t === "sim") return "sim";
+  const hit = DISC.find((d) => {
+    const id = foldTxt(d.id);
+    const sg = foldTxt(d.sigla).replace(/[^a-z0-9]+/g, "");
+    const nm = foldTxt(d.name);
+    return t === id || t === sg || nm.indexOf(t) !== -1 || t.indexOf(sg) !== -1 || t.indexOf(id) !== -1;
   });
-  const whoami = $("whoami");
-  if (whoami) whoami.textContent = userName() ? userName() + " · GCM Nísia" : "GCM Nísia Floresta";
+  return hit ? hit.id : null;
+}
+function resolveDayToken(token) {
+  const t = foldTxt(token);
+  const map = {
+    seg: ["seg", "segunda", "2a"],
+    ter: ["ter", "terca", "3a"],
+    qua: ["qua", "quarta", "4a"],
+    qui: ["qui", "quinta", "5a"],
+    sex: ["sex", "sexta", "6a"],
+    sab: ["sab", "sabado"],
+    dom: ["dom", "domingo"],
+  };
+  return Object.keys(map).find((k) => map[k].indexOf(t) !== -1) || null;
+}
+function resolveCicloToken(token) {
+  const t = foldTxt(token).replace("ciclo", "").trim();
+  const map = { "1": "i", i: "i", "2": "ii", ii: "ii", "3": "iii", iii: "iii", "4": "iv", iv: "iv", "5": "v", v: "v", "6": "vi", vi: "vi", "7": "vii", vii: "vii" };
+  return map[t] || null;
+}
+function setBoardSlot(meta, slot, ciclo, patch) {
+  ensurePlan();
+  if (!S.board[meta] || !S.board[meta].slots[slot]) return;
+  S.board[meta].slots[slot][ciclo] = Object.assign(blankCell(), S.board[meta].slots[slot][ciclo] || {}, patch);
+}
+function applyChatPlan(raw) {
+  const text = String(raw || "").trim();
+  const t = foldTxt(text);
+  if (!t) return null;
+  if (/^(ajuda|help|\?|comandos)$/.test(t)) {
+    return "Comandos: segunda port infor rlm · meta 2 ciclo 3 slot 1 penal · q port 20 15 · semana 2 · automatico · manual · reorganizar";
+  }
+  if (/reorganiz/.test(t)) {
+    rotatePlan();
+    S.planMode = "auto";
+    return "Grade reorganizada pelo peso.";
+  }
+  if (/automatico/.test(t)) { S.planMode = "auto"; return "Modo automático."; }
+  if (/^manual$/.test(t)) { S.planMode = "manual"; return "Modo manual. A grade não gira sozinha."; }
+  const week = t.match(/semana\s+(\d+)/);
+  if (week) {
+    S.week = Math.min(14, Math.max(1, Number(week[1]) || 1));
+    if (S.planMode === "auto") rotatePlan();
+    return "Semana " + S.week + ".";
+  }
+  const q = t.match(/^(?:q|quest(?:ao|oes)?)\s+(\S+)\s+(\d+)(?:\s+(\d+))?/);
+  if (q) {
+    const id = resolveDiscToken(q[1]);
+    if (!id || id === "sim") return "Não achei essa disciplina.";
+    const n = Number(q[2]) || 0;
+    const hits = q[3] != null ? Number(q[3]) : (S.logs[S.week + "-" + id] || {}).hits || 0;
+    S.logs[S.week + "-" + id] = { n, hits: Math.min(n, hits) };
+    return DISC.find((d) => d.id === id).sigla + ": " + n + " resolvidas, " + Math.min(n, hits) + " acertos.";
+  }
+  const slotCmd = t.match(/^(?:meta\s+(\d+)\s+)?ciclo\s+(\d+|i{1,3}v?)\s+(?:slot|bloco|linha|1h)?\s*(\d+)\s+(.+)$/);
+  if (slotCmd) {
+    const meta = Math.max(0, Math.min(3, (Number(slotCmd[1]) || 1) - 1));
+    const ciclo = resolveCicloToken(slotCmd[2]);
+    const slot = Math.max(0, Math.min(2, (Number(slotCmd[3]) || 1) - 1));
+    const id = resolveDiscToken(slotCmd[4].split(/\s+/)[0]);
+    if (!ciclo || !id) return "Não entendi ciclo/matéria.";
+    setBoardSlot(meta, slot, ciclo, { disc: id });
+    S.planMode = "manual";
+    const d = DISC.find((x) => x.id === id);
+    return "META " + (meta + 1) + " · " + ciclo.toUpperCase() + " · 1H " + (slot + 1) + " = " + (d ? d.sigla : id);
+  }
+  const parts = text.split(/[,\s;+/]+/).filter(Boolean);
+  const day = resolveDayToken(parts[0]);
+  if (day && parts.length > 1) {
+    const cid = cicloOfDay(day);
+    const ids = parts.slice(1).map(resolveDiscToken).filter(Boolean).slice(0, 3);
+    if (!ids.length) return "Não achei as matérias desse dia.";
+    ids.forEach((id, i) => setBoardSlot(0, i, cid, { disc: id }));
+    S.day = day;
+    S.planMode = "manual";
+    page = "ciclo";
+    return DAYS.find((d) => d.id === day).label + ": " + ids.map((id) => (id === "sim" ? "Simulado" : DISC.find((d) => d.id === id).sigla)).join(", ");
+  }
+  return null;
+}
+function sendPlanChat(inp) {
+  if (!inp || !inp.value.trim()) return;
+  const pal = S.chatWith || S.me.id;
+  S.chats[pal] = S.chats[pal] || [];
+  const text = inp.value.trim();
+  const ts = Date.now();
+  S.chats[pal].push({ from: "me", text, ts });
+  S.chatWith = pal;
+  inp.value = "";
+  if (window.PIRoom) PIRoom.postText(text);
+  const reply = applyChatPlan(text);
+  if (reply) {
+    S.chats[pal].push({ from: "them", text: reply, ts: ts + 1 });
+    if (window.PIRoom) PIRoom.note(reply);
+    save(S);
+    render({ force: true });
+  } else {
+    save(S);
+    pump({ chat: { fromId: S.me.id, text, ts } });
+    paintDock();
+    if (page === "chat") render();
+  }
+}
+
+function sheetTotals() {
+  const totH = { all: 0 };
+  const totQ = { all: 0 };
+  DAYS.forEach((d) => { totH[d.id] = 0; totQ[d.id] = 0; });
+  if (!S.sheet || !S.sheet.rows) return { totH, totQ };
+  S.sheet.rows.forEach((row) => {
+    DAYS.forEach((d) => {
+      const c = (row.cells && row.cells[d.id]) || {};
+      totH[d.id] += Number(c.horas) || 0;
+      totQ[d.id] += Number(c.ques) || 0;
+    });
+  });
+  totH.all = DAYS.reduce((a, d) => a + totH[d.id], 0);
+  totQ.all = DAYS.reduce((a, d) => a + totQ[d.id], 0);
+  return { totH, totQ };
+}
+
+function sheetRowHtml(row) {
+  if (!row) return "";
+  const opts = [{ id: "", sigla: "—" }, { id: "sim", sigla: "Simulado" }, ...DISC];
+  const cell = (day) => {
+    const c = (row.cells && row.cells[day.id]) || blankCell();
+    return `<td>
+      <select data-sheet="disc" data-row="${row.id}" data-day="${day.id}">
+        ${opts.map((o) => `<option value="${o.id}" ${o.id === c.disc ? "selected" : ""}>${o.sigla}</option>`).join("")}
+      </select>
+      <div class="sheet-mini">
+        <input data-sheet="horas" data-row="${row.id}" data-day="${day.id}" value="${c.horas}" placeholder="h">
+        <input data-sheet="ques" data-row="${row.id}" data-day="${day.id}" value="${c.ques}" placeholder="q">
+      </div>
+    </td>`;
+  };
+  return `<tr data-row="${row.id}">
+    <td><input class="sheet-label" data-sheet="label" data-row="${row.id}" value="${String(row.label || "").replace(/"/g, "")}"></td>
+    ${DAYS.map(cell).join("")}
+    <td><button class="btn ghost" data-sheet-del="${row.id}">×</button></td>
+  </tr>`;
+}
+
+function paintSheetTotals() {
+  const foot = document.querySelector("#sheetRoot tfoot");
+  if (!foot) return;
+  const { totH, totQ } = sheetTotals();
+  foot.innerHTML = `<tr>
+    <th>Total h / q</th>
+    ${DAYS.map((d) => `<th>${totH[d.id]}h · ${totQ[d.id]}q</th>`).join("")}
+    <th>${totH.all}h · ${totQ.all}q</th>
+  </tr>`;
+}
+
+function render(opts) {
+  if (window.PI && PI._lock) return;
+  if (window.PI) PI._lock = true;
+  try {
+    if (window.PI) PI.hook("beforeRender", page, S);
+    paintGate();
+    paintTour();
+    applyZoom();
+    applyView();
+    if (!pages[page]) page = "comando";
+    const view = $("view");
+    const keep = page === "planilha" && view && view.querySelector("#sheetRoot")
+      && window.PI && PI.typingIn(view) && !(opts && opts.force);
+    if (keep) {
+      paintSheetTotals();
+    } else if (view) {
+      const html = pages[page]();
+      view.innerHTML = typeof html === "string" ? html : "";
+    }
+    document.querySelectorAll("[data-nav]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.nav === page);
+    });
+    const whoami = $("whoami");
+    if (whoami) whoami.textContent = "Planilha Inteligente";
+    const tn = $("topName");
+    const te = $("topEmail");
+    if (tn && document.activeElement !== tn) tn.value = S.me.name || "";
+    if (te && document.activeElement !== te) te.value = (S.me && S.me.email) || "";
+    paintDock();
+    if (window.PI) PI.hook("afterRender", page, S);
+    if (page === "planilha" && window.PI && PI.sheetBind) {
+      PI.sheetBind({
+        root: "#sheetRoot",
+        rows: function () { return (S.sheet && S.sheet.rows) || []; },
+        renderRow: sheetRowHtml
+      });
+      PI.sheetPaint();
+    }
+  } catch (_) {
+    const view = $("view");
+    if (view && !view.querySelector("#sheetRoot")) {
+      view.innerHTML = `<div class="card"><p class="kicker">Render</p><p>A sala não montou. Os dados continuam gravados.</p></div>`;
+    }
+  } finally {
+    if (window.PI) PI._lock = false;
+  }
 }
 
 const pages = {
@@ -483,49 +882,105 @@ const pages = {
       const xs = DISC.map((d) => rate(d.id)).filter((x) => x !== null);
       return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
     })();
+    const pct = avg == null ? 0 : Math.round(avg * 100);
+    const port = rate("port");
+    const dirIds = ["const", "admin", "penal", "proc", "estat"];
+    const dirXs = dirIds.map(rate).filter((x) => x !== null);
+    const dir = dirXs.length ? Math.round(dirXs.reduce((a, b) => a + b, 0) / dirXs.length * 100) : 0;
+    const leg = rate("legmun");
+    const peso = Math.round(importance(top) * 100);
     return `
-      ${cover("comando")}
-      <p class="kicker">Comando · semana ${S.week} · Edital 02/2026 · IDIB</p>
-      ${S.mestre && S.mestre.notice ? `<div class="card" style="margin-bottom:12px"><div class="muted">DO CHAT GROK</div><p>${S.mestre.notice}</p></div>` : ""}
-      <h1>${userName() ? userName() + ", " : ""}${(S.mestre && S.mestre.copy && S.mestre.copy.comandoTitle) || "o que falta, no que pesa."}</h1>
-      <p class="sub">Nível = seu acerto. Importância = pontos oficiais da prova (90) + presença em 9 editais recentes de Guarda + se o tema costuma cair de fato.</p>
-      <div class="grid g4">
-        <div class="card"><div class="muted">Acerto médio</div><div class="kpi">${avg == null ? "—" : Math.round(avg * 100) + "%"}</div></div>
-        <div class="card"><div class="muted">Disciplinas lançadas</div><div class="kpi">${done}/${DISC.length}</div></div>
-        <div class="card"><div class="muted">Prova</div><div class="kpi">60q · 90 pts</div></div>
-        <div class="card"><div class="muted">Direito sozinho</div><div class="kpi">60 pts</div></div>
+      <div class="hero-title">
+        <h1>Desempenho Geral</h1>
+        <p class="muted">Overall Performance · Nísia 2026 · semana ${S.week}</p>
       </div>
-      <div class="card" style="margin-top:12px">
-        <div class="muted">PRÓXIMO FOCO</div>
-        <h2 style="margin:6px 0 4px">${top.sigla} — ${top.name}</h2>
-        <p class="muted">Importância ${Math.round(importance(top)*100)} · nível ${level(rate(top.id)).label} · ${top.editais}/9 editais de GM</p>
-        <div class="row" style="margin-top:12px">
-          <button class="btn" data-go="radar">Ver radar</button>
-          <button class="btn ghost" data-go="questoes">Lançar questões</button>
+      <div class="dash-hero">
+        <div class="card ring-card">
+          <div class="ring" style="--p:${pct}%"><span>
+            <div class="muted">Desempenho Geral</div>
+            <strong class="kpi huge">${pct}%</strong>
+            <div class="muted">${done}/${DISC.length} lançadas</div>
+          </span></div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="muted">PROGRESSO · SEMANA</div>
+            <div class="kpi">${Math.max(pct, peso)}% · ${top.pts} pts</div>
+            <div class="bar"><i style="width:${Math.min(100, Math.max(pct, 8))}%"></i></div>
+          </div>
+          <div class="card stars">
+            <div><b>0%</b><span class="muted">Peso baixo</span></div>
+            <div><b>${dir}%</b><span class="muted">Direito</span></div>
+            <div><b>${port == null ? 0 : Math.round(port * 100)}%</b><span class="muted">Português</span></div>
+            <div class="onair"><b>${liveStatus === "on" ? "on" : "24%"}</b><span class="muted">Online</span></div>
+          </div>
+        </div>
+        <div class="card copilot">
+          <p class="copilot-lead">Use a IA para facilitar seu manuseio.</p>
+          <h2>IA Copilot: otimizando seu plano</h2>
+          <div class="wave">${"<i></i>".repeat(18)}</div>
+          <button class="voice-btn" id="voiceAsk" type="button">
+            <strong>${userName() || "Seu nome"}</strong>
+            <span>Peça por comando de voz.</span>
+          </button>
+        </div>
+        <div class="card">
+          <div class="muted">GRAU DE DISCIPLINAS</div>
+          <div class="disc-line"><span>Português</span><div class="bar cyan"><i style="width:${port == null ? 8 : Math.round(port * 100)}%"></i></div></div>
+          <div class="disc-line"><span>Direito</span><div class="bar blue"><i style="width:${dir || 8}%"></i></div></div>
+          <div class="disc-line"><span>Legislação</span><div class="bar violet"><i style="width:${leg == null ? 8 : Math.round(leg * 100)}%"></i></div></div>
+        </div>
+        <div class="card">
+          <div class="muted">COMANDO · SEMANA ${S.week}</div>
+          <h2>${userName() || "Guilherme"}, o que falta, no que pesa.</h2>
+          <p class="muted">${top.sigla} — ${top.name}. Importância ${peso} · ${level(rate(top.id)).label}.</p>
+          <div class="row" style="margin-top:12px">
+            <button class="btn" data-go="edital">Volume do edital</button>
+            <button class="btn ghost" data-go="questoes">Questões</button>
+          </div>
         </div>
       </div>
-      <h3>Fila de estudo (maior buraco primeiro)</h3>
-      ${ranked.slice(0, 6).map((d) => rowDisc(d)).join("")}
+    `;
+  },
+  desempenho() {
+    return `
+      <p class="kicker">Desempenho</p>
+      <h1>Acerto por disciplina</h1>
+      <p class="sub">Cada barra é o seu acerto. Sem lançamento, fica sem dados.</p>
+      <div class="disc-board">
+      ${DISC.map((d) => {
+        const r = rate(d.id);
+        const pct = r == null ? 0 : Math.round(r * 100);
+        const lv = level(r);
+        return `<article class="card disc-item">
+          <div class="row" style="justify-content:space-between">
+            <strong>${d.sigla}</strong>
+            <span class="${lv.cls}">${r == null ? "sem dados" : pct + "%"}</span>
+          </div>
+          <div class="muted">${d.name}</div>
+          <div class="bar"><i style="width:${r == null ? 0 : Math.max(pct, 4)}%"></i></div>
+        </article>`;
+      }).join("")}
+      </div>
     `;
   },
   radar() {
     return `
-      ${cover("radar")}
       <p class="kicker">Radar</p>
-      <h1>Desempenho × peso da prova</h1>
-      <p class="sub">Barra mint = importância na prova de Nísia Floresta. Texto à direita = seu nível atual.</p>
+      <h1>Importância × peso da prova</h1>
+      <p class="sub">Barra mint = importância na prova. O texto à direita é o peso oficial, não o seu acerto.</p>
+      <div class="disc-board">
       ${[...DISC].sort((a,b)=>importance(b)-importance(a)).map((d) => {
-        const lv = level(rate(d.id));
-        const r = rate(d.id);
-        return `<div class="card" style="margin-bottom:8px">
+        return `<article class="card disc-item">
           <div class="row" style="justify-content:space-between">
             <strong>${d.sigla}</strong>
-            <span class="${lv.cls}">${lv.label}${r!=null? " · "+Math.round(r*100)+"%":""}</span>
+            <span class="muted">${d.pts} pts</span>
           </div>
-          <div class="muted">${d.name} · ${d.pts} pts oficiais · ${d.editais}/9 editais · caiu em ${d.provas}/9 amostras</div>
+          <div class="muted">${d.name}</div>
           <div class="bar"><i style="width:${Math.round(importance(d)*100)}%"></i></div>
-        </div>`;
+        </article>`;
       }).join("")}
+      </div>
     `;
   },
   edital() {
@@ -552,82 +1007,98 @@ const pages = {
     `;
   },
   questoes() {
+    ensurePlan();
+    const day = DAYS.find((d) => d.id === S.day) || DAYS[0];
+    const list = discsPlanned(day.id);
     return `
-      ${cover("questoes")}
-      <p class="kicker">Questões · semana ${S.week}</p>
-      <h1>Lance o volume. O nível fecha sozinho.</h1>
+      <p class="kicker">Questões · ${day.label} · semana ${S.week}</p>
+      <h1>Só o que caiu neste dia.</h1>
+      <p class="sub">As disciplinas vêm do Plano de Estudos. Resolvidas e acertos entram por matéria do dia.</p>
       <div class="row" style="margin-bottom:12px">
+        <label class="muted">Dia
+          <select id="dayIn">${DAYS.map((d) => `<option value="${d.id}" ${d.id === day.id ? "selected" : ""}>${d.label}</option>`).join("")}</select>
+        </label>
         <label class="muted">Semana <input type="number" min="1" max="14" value="${S.week}" id="weekIn" style="width:72px"></label>
+        <button class="btn ghost" data-go="ciclo">Editar plano</button>
       </div>
-      ${DISC.map((d) => {
+      ${list.length ? list.map((d) => {
         const l = logOf(d.id);
         const lv = level(rate(d.id));
         return `<div class="card" style="margin-bottom:8px">
           <div class="row" style="justify-content:space-between">
-            <div><strong>${d.sigla}</strong><div class="muted">${d.pts} pts · ${d.editais}/9 editais</div></div>
+            <div><strong>${d.sigla}</strong><div class="muted">${d.name}</div></div>
             <span class="${lv.cls}">${lv.label}</span>
           </div>
           <div class="row" style="margin-top:8px">
-            <label class="muted">Ques. <input type="number" min="0" value="${l.n}" data-q="${d.id}" style="width:80px"></label>
-            <label class="muted">Acertos <input type="number" min="0" value="${l.hits}" data-h="${d.id}" style="width:80px"></label>
+            <label class="muted">Resolvidas <input type="number" min="0" value="${l.n}" data-q="${d.id}" style="width:88px"></label>
+            <label class="muted">Acertos <input type="number" min="0" value="${l.hits}" data-h="${d.id}" style="width:88px"></label>
           </div>
         </div>`;
-      }).join("")}
+      }).join("") : `<div class="card"><p>Nada planejado para ${day.label}. Abra Plano de Estudos e escolha as matérias do dia.</p></div>`}
     `;
   },
   ciclo() {
-    const bag = [];
-    DISC.forEach((d) => {
-      const w = Math.max(1, Math.round(importance(d) * 10));
-      for (let i = 0; i < w; i++) bag.push(d);
-    });
-    const slots = [];
-    for (let c = 1; c <= 6; c++) {
-      for (let b = 1; b <= 3; b++) {
-        const i = (c - 1) * 3 + (b - 1);
-        const ticket = ((S.week - 1) * 7 + i) % bag.length;
-        slots.push({ c, b, d: bag[ticket] });
-      }
-    }
-    let html = `${cover("ciclo")}<p class="kicker">Ciclo</p><h1>Semana ${S.week} — 18 blocos + simulado</h1>
-      <p class="sub">O saco de fichas usa a importância (pontos oficiais × frequência em editais). Semana anda 7 fichas.</p>
-      <div class="row"><button class="btn ghost" id="wprev">Anterior</button><button class="btn ghost" id="wnext">Próxima</button></div>`;
-    for (let c = 1; c <= 6; c++) {
-      html += `<div class="card" style="margin-top:10px"><div class="muted">CICLO ${c}</div><div class="grid g2" style="margin-top:8px">`;
-      slots.filter((s) => s.c === c).forEach((s) => {
-        html += `<div><strong>${s.d.sigla}</strong><div class="muted">bloco ${s.b} · 1h · ${s.d.pts} pts</div></div>`;
-      });
-      html += `</div></div>`;
-    }
-    html += `<div class="card" style="margin-top:10px"><div class="muted">CICLO VII</div><h3>Simulado IDIB</h3><p class="muted">Fecha a semana no padrão 60 questões.</p></div>`;
-    return html;
+    ensurePlan();
+    const opts = "";
+    return `
+      <p class="kicker">Plano de Estudos · semana ${S.week}</p>
+      <h1>Grade META × CICLO.</h1>
+      <p class="sub">CICLO I–VI = Seg a Sáb (3 blocos de 1H). CICLO VII = Simulado. Tudo se preenche na mão: matéria, hora, questões e nota.</p>
+      <div class="row" style="margin-bottom:12px">
+        <button class="btn ghost" id="wprev">Semana −</button>
+        <button class="btn ghost" id="wnext">Semana +</button>
+        <button class="btn ${S.planMode === "auto" ? "" : "ghost"}" id="planAuto">Automático</button>
+        <button class="btn ${S.planMode === "manual" ? "" : "ghost"}" id="planManual">Manual</button>
+        <button class="btn ghost" id="planRotate">Reorganizar agora</button>
+      </div>
+      <div class="ciclo-wrap">
+        ${S.board.map((meta, mi) => `
+          <table class="ciclo-grid">
+            <thead>
+              <tr>
+                <th class="meta-h">${meta.label}</th>
+                ${CICLOS.map((c) => `<th>${c.label}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${meta.slots.map((slot, si) => `
+                <tr>
+                  <th>1H</th>
+                  ${CICLOS.map((c) => {
+                    const cell = slot[c.id] || blankCell();
+                    if (c.simulado && si === 0) {
+                      return `<td class="sim" rowspan="3">
+                        <input data-board="nota" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${(slot[c.id] && slot[c.id].nota) || "Simulado"}">
+                        <select data-board="disc" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}">${discOpts(cell.disc || "sim")}</select>
+                        <div class="sheet-mini">
+                          <input data-board="horas" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${cell.horas || "2"}" placeholder="h">
+                          <input data-board="ques" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${cell.ques || ""}" placeholder="q">
+                        </div>
+                      </td>`;
+                    }
+                    if (c.simulado) return "";
+                    return `<td>
+                      <select data-board="disc" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}">
+                        ${discOpts(cell.disc)}
+                      </select>
+                      <div class="sheet-mini">
+                        <input data-board="horas" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}" value="${cell.horas || "1"}" placeholder="h">
+                        <input data-board="ques" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}" value="${cell.ques || ""}" placeholder="q">
+                      </div>
+                      <input data-board="nota" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}" value="${cell.nota || ""}" placeholder="obs">
+                    </td>`;
+                  }).join("")}
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `).join("")}
+      </div>
+    `;
   },
   planilha() {
     if (!S.sheet || !S.sheet.rows) S.sheet = emptySheet();
-    const opts = [{ id: "", sigla: "—" }, { id: "sim", sigla: "Simulado" }, ...DISC];
-    const totH = { all: 0 };
-    const totQ = { all: 0 };
-    DAYS.forEach((d) => { totH[d.id] = 0; totQ[d.id] = 0; });
-    S.sheet.rows.forEach((row) => {
-      DAYS.forEach((d) => {
-        totH[d.id] += Number(row.cells[d.id].horas) || 0;
-        totQ[d.id] += Number(row.cells[d.id].ques) || 0;
-      });
-    });
-    totH.all = DAYS.reduce((a, d) => a + totH[d.id], 0);
-    totQ.all = DAYS.reduce((a, d) => a + totQ[d.id], 0);
-    const cell = (row, day) => {
-      const c = row.cells[day.id] || blankCell();
-      return `<td>
-        <select data-sheet="disc" data-row="${row.id}" data-day="${day.id}">
-          ${opts.map((o) => `<option value="${o.id}" ${o.id === c.disc ? "selected" : ""}>${o.sigla}</option>`).join("")}
-        </select>
-        <div class="sheet-mini">
-          <input data-sheet="horas" data-row="${row.id}" data-day="${day.id}" value="${c.horas}" placeholder="h">
-          <input data-sheet="ques" data-row="${row.id}" data-day="${day.id}" value="${c.ques}" placeholder="q">
-        </div>
-      </td>`;
-    };
+    const { totH, totQ } = sheetTotals();
     return `
       ${cover("ciclo")}
       <p class="kicker">Planilha manual · semana ${S.week}</p>
@@ -639,7 +1110,7 @@ const pages = {
         <button class="btn ghost" id="sheetClear">Limpar</button>
         <button class="btn ghost" id="sheetCsv">Baixar CSV</button>
       </div>
-      <div class="sheet-wrap">
+      <div class="sheet-wrap" id="sheetRoot">
         <table class="sheet">
           <thead>
             <tr>
@@ -648,13 +1119,7 @@ const pages = {
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            ${S.sheet.rows.map((row) => `<tr>
-              <td><input class="sheet-label" data-sheet="label" data-row="${row.id}" value="${row.label.replace(/"/g, "")}"></td>
-              ${DAYS.map((d) => cell(row, d)).join("")}
-              <td><button class="btn ghost" data-sheet-del="${row.id}">×</button></td>
-            </tr>`).join("")}
-          </tbody>
+          <tbody></tbody>
           <tfoot>
             <tr>
               <th>Total h / q</th>
@@ -800,6 +1265,40 @@ const pages = {
       </div>
     `;
   },
+  simulados() {
+    const logs = Array.isArray(S.simLogs) ? S.simLogs : [];
+    const opts = DISC.map((d) => `<label class="muted"><input type="checkbox" data-simdisc="${d.id}"> ${d.sigla}</label>`).join("");
+    const rows = logs.map((r) => {
+      const nomes = (r.discs || []).map((id) => {
+        const d = DISC.find((x) => x.id === id);
+        return d ? d.sigla : id;
+      }).join(", ");
+      return `<div class="card" style="margin-bottom:8px">
+        <div class="row" style="justify-content:space-between">
+          <strong>${r.nome || "Simulado"}</strong>
+          <button class="btn ghost" type="button" data-simdel="${r.id}">Apagar</button>
+        </div>
+        <p class="muted">${r.data || "sem data"} · ${r.pontos || 0}${r.total ? "/" + r.total : ""} pts</p>
+        <p>${nomes || "sem disciplina"}</p>
+      </div>`;
+    }).join("");
+    return `
+      <p class="kicker">Simulados</p>
+      <h1>Registros de simulados</h1>
+      <p class="sub">Pontuação e disciplinas de cada simulado feito. Esta sala não abre o plano de estudos.</p>
+      <div class="card">
+        <div class="row">
+          <label class="muted">Nome <input id="simNome" placeholder="Simulado 1"></label>
+          <label class="muted">Data <input id="simData" type="date"></label>
+          <label class="muted">Pontos <input id="simPts" type="number" min="0" value="0"></label>
+          <label class="muted">Total <input id="simTot" type="number" min="0" value="0"></label>
+        </div>
+        <div class="row" style="margin-top:8px;flex-wrap:wrap">${opts}</div>
+        <button class="btn" id="simAdd" type="button" style="margin-top:12px">Registrar simulado</button>
+      </div>
+      <div style="margin-top:12px">${rows || `<p class="muted">Nenhum simulado registrado.</p>`}</div>
+    `;
+  },
 };
 
 function rowDisc(d) {
@@ -818,27 +1317,77 @@ document.addEventListener("click", (e) => {
   if (nav) { page = nav.dataset.nav; $("side").classList.remove("open"); render(); }
   const go = e.target.closest("[data-go]");
   if (go) { page = go.dataset.go; render(); }
-  if (e.target.id === "menu") $("side").classList.toggle("open");
+  if (e.target.id === "menu" || (e.target.closest && e.target.closest("#menu"))) {
+    const side = $("side");
+    const arrow = $("menu");
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      side.classList.toggle("open");
+      if (arrow) arrow.textContent = side.classList.contains("open") ? "‹" : "›";
+    } else {
+      side.classList.toggle("collapsed");
+      if (arrow) arrow.textContent = side.classList.contains("collapsed") ? "›" : "‹";
+      try { localStorage.setItem("pi-side", side.classList.contains("collapsed") ? "1" : "0"); } catch (_) {}
+    }
+  }
   const av = e.target.closest("[data-avatar]");
   if (av) {
     S.avatar = av.dataset.avatar;
     save(S, true);
     paintGate();
   }
+  if (e.target.id === "simAdd") {
+    if (!Array.isArray(S.simLogs)) S.simLogs = [];
+    const discs = [...document.querySelectorAll("[data-simdisc]:checked")].map((x) => x.dataset.simdisc);
+    S.simLogs.unshift({
+      id: "s" + Date.now(),
+      nome: (($("simNome") && $("simNome").value) || "").trim() || "Simulado",
+      data: ($("simData") && $("simData").value) || "",
+      pontos: Math.max(0, Number($("simPts") && $("simPts").value) || 0),
+      total: Math.max(0, Number($("simTot") && $("simTot").value) || 0),
+      discs,
+    });
+    save(S);
+    render({ force: true });
+    return;
+  }
+  const simDel = e.target.closest("[data-simdel]");
+  if (simDel && Array.isArray(S.simLogs)) {
+    S.simLogs = S.simLogs.filter((r) => r.id !== simDel.dataset.simdel);
+    save(S);
+    render({ force: true });
+    return;
+  }
+  if (e.target.id === "backupBtn") {
+    sendBackup();
+    return;
+  }
   if (e.target.id === "gateStart") {
     const name = (($("gateName") && $("gateName").value) || "").trim();
-    if (!name) {
-      const err = $("gateErr");
-      if (err) err.textContent = "Escreve o nome para entrar.";
+    const email = (($("gateEmail") && $("gateEmail").value) || "").trim();
+    const pass = (($("gatePass") && $("gatePass").value) || "").trim();
+    const err = $("gateErr");
+    const done = (msg) => {
+      if (msg) { if (err) err.textContent = msg; return; }
+      if (window.PISession) PISession.afterEnter();
+      render();
+    };
+    if (window.PISession && PISession.enterAccount) {
+      PISession.enterAccount(name, email, pass).then(done);
       return;
     }
+    if (!name) { if (err) err.textContent = "Escreve o nome para entrar."; return; }
     S.me.name = name;
-    S.me.handle = S.me.handle || name.replace(/\s+/g, "").slice(0, 16);
     S.entered = true;
     S.tourDone = true;
-    S.tourStep = 0;
     save(S);
     render();
+    return;
+  }
+  if (e.target.id === "logoutBtn") {
+    const go = () => { S = defaultState(); S.entered = false; S.viewMode = "barras"; render(); };
+    if (window.PISession && PISession.exitAccount) PISession.exitAccount().then(go);
+    else go();
+    return;
   }
   if (e.target.id === "tourNext") {
     S.tourStep += 1;
@@ -864,8 +1413,36 @@ document.addEventListener("click", (e) => {
     save(S, true);
     applyZoom();
   }
-  if (e.target.id === "wprev") { S.week = Math.max(1, S.week - 1); save(S); render(); }
-  if (e.target.id === "wnext") { S.week = Math.min(14, S.week + 1); save(S); render(); }
+  const vbtn = e.target.closest("[data-view]");
+  if (vbtn) {
+    S.viewMode = vbtn.dataset.view === "blocos" ? "blocos" : "barras";
+    save(S, true);
+    applyView();
+    render({ force: true });
+  }
+  if (e.target.id === "wprev") {
+    S.week = Math.max(1, S.week - 1);
+    if (S.planMode === "auto") rotatePlan();
+    save(S); render({ force: true });
+  }
+  if (e.target.id === "wnext") {
+    S.week = Math.min(14, S.week + 1);
+    if (S.planMode === "auto") rotatePlan();
+    save(S); render({ force: true });
+  }
+  if (e.target.id === "planAuto") { S.planMode = "auto"; rotatePlan(); render({ force: true }); }
+  if (e.target.id === "planManual") { S.planMode = "manual"; save(S); render({ force: true }); }
+  if (e.target.id === "planRotate") { rotatePlan(); render({ force: true }); }
+  if (e.target.dataset.pickDay) { S.day = e.target.dataset.pickDay; save(S); render(); }
+  if (e.target.dataset.planDel) {
+    const day = e.target.dataset.planDel;
+    const disc = e.target.dataset.disc;
+    S.sheet.rows.forEach((row) => {
+      if (row.cells[day] && row.cells[day].disc === disc) row.cells[day] = blankCell();
+    });
+    S.planMode = "manual";
+    save(S); render({ force: true });
+  }
   if (e.target.id === "sheetAdd") {
     const n = S.sheet.rows.length + 1;
     S.sheet.rows.push({
@@ -874,29 +1451,31 @@ document.addEventListener("click", (e) => {
       cells: Object.fromEntries(DAYS.map((d) => [d.id, blankCell()])),
     });
     save(S);
-    render();
+    render({ force: true });
   }
   if (e.target.id === "sheetSeed") {
     S.sheet = seedSheetFromCycle();
     save(S);
-    render();
+    render({ force: true });
   }
   if (e.target.id === "sheetClear") {
     S.sheet = emptySheet();
     save(S);
-    render();
+    render({ force: true });
   }
   if (e.target.id === "sheetCsv") {
     const blob = new Blob(["\ufeff" + sheetCsv()], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    a.href = url;
     a.download = "vigilia-planilha-semana-" + S.week + ".csv";
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
   if (e.target.dataset.sheetDel) {
     S.sheet.rows = S.sheet.rows.filter((r) => r.id !== e.target.dataset.sheetDel);
     save(S);
-    render();
+    render({ force: true });
   }
   if (e.target.dataset.openchat) {
     S.chatWith = e.target.dataset.openchat;
@@ -952,18 +1531,10 @@ document.addEventListener("click", (e) => {
       msg.textContent = "Não deu para ler o código. Peça um VG1. novo.";
     }
   }
-  if (e.target.id === "chatSend") {
-    const pal = S.chatWith;
-    const inp = $("chatIn");
-    if (pal && inp && inp.value.trim()) {
-      S.chats[pal] = S.chats[pal] || [];
-      const text = inp.value.trim();
-      const ts = Date.now();
-      S.chats[pal].push({ from: "me", text, ts });
-      save(S);
-      pump({ chat: { fromId: S.me.id, text, ts } });
-      render();
-    }
+  if (e.target.id === "chatSend" || e.target.id === "dockSend") {
+    const pal = S.chatWith || S.me.id;
+    const inp = e.target.id === "dockSend" ? $("dockIn") : $("chatIn");
+    if (inp && inp.value.trim()) sendPlanChat(inp);
   }
   if (e.target.id === "chatExport") {
     const pal = S.chatWith;
@@ -1016,22 +1587,67 @@ document.addEventListener("click", (e) => {
     });
   }
 });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target && e.target.id === "dockIn") {
+    e.preventDefault();
+    sendPlanChat(e.target);
+  }
+});
 document.addEventListener("input", (e) => {
   captureField(e.target);
   save(S, true);
+  if (e.target.dataset && e.target.dataset.sheet) paintSheetTotals();
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "topFile" && e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => restoreBackup(String(reader.result || ""), file.name);
+    reader.readAsText(file);
+    e.target.value = "";
+    return;
+  }
   captureField(e.target);
+  if (e.target.dataset && e.target.dataset.planAdd && e.target.value) {
+    const day = e.target.dataset.planAdd;
+    const disc = e.target.value;
+    let slot = S.sheet.rows.find((r) => !r.cells[day] || !r.cells[day].disc);
+    if (!slot) {
+      slot = { id: "r" + Date.now(), label: "BLOCO", cells: Object.fromEntries(DAYS.map((d) => [d.id, blankCell()])) };
+      S.sheet.rows.push(slot);
+    }
+    slot.cells[day] = { disc, horas: "1", ques: "20", nota: "" };
+    S.planMode = "manual";
+    save(S); render({ force: true });
+    return;
+  }
   save(S, true);
-  if (e.target.id === "weekIn" || e.target.dataset.q || e.target.dataset.h) render();
+  if (e.target.id === "weekIn") {
+    if (S.planMode === "auto") rotatePlan();
+    render({ force: true });
+  }
+  if (e.target.dataset && e.target.dataset.board === "disc") render({ force: true });
+  if (e.target.id === "dayIn" || e.target.dataset.q || e.target.dataset.h) render();
 });
 window.addEventListener("pagehide", flushNow);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") flushNow();
 });
 
-render();
+if (window.PI) {
+  PI.mergePages(pages);
+  PI.use("gcm-nisia");
+  PI.hook("boot", S);
+}
+try {
+  if (localStorage.getItem("pi-side") === "1" && $("side")) {
+    $("side").classList.add("collapsed");
+    if ($("menu")) $("menu").textContent = "›";
+  }
+} catch (_) {}
+render({ force: true });
 readDisk().then((disk) => {
+  if (window.__piUserLock || (S.entered && S.me && S.me.email)) return;
   if (!disk || !disk.raw) {
     save(S, true);
     return;

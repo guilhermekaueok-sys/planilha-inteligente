@@ -1,5 +1,5 @@
-const CACHE = "planilha-inteligente-v5";
-const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json", "./icon.svg", "./logo.jpg"];
+const CACHE = "planilha-inteligente-v14";
+const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./session.js", "./firebase-config.js", "./engine.js", "./projetos/gcm-nisia.js", "./manifest.json", "./icon.svg", "./logo.jpg", "./logo-pi.svg"];
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
   self.skipWaiting();

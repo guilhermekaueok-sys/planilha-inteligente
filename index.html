@@ -7,10 +7,18 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-pi.svg" />
-  <link rel="stylesheet" href="./styles.css?v=15" />
+  <link rel="stylesheet" href="./styles.css?v=14" />
 </head>
 <body>
-  <div id="chrome-only" hidden></div>
+  <div id="chrome-only" hidden>
+    <div class="chrome-card">
+      <img class="mark" src="./logo.jpg" alt="">
+      <p class="kicker">Planilha Inteligente</p>
+      <h1>Abra no Google Chrome</h1>
+      <p class="sub">Este app foi programado para rodar só no Chrome.</p>
+      <p class="muted" id="chrome-url"></p>
+    </div>
+  </div>
   <div id="gate" hidden>
     <div class="gate-card">
       <p class="kicker">JARVIS · Planilha Inteligente</p>
@@ -26,44 +34,62 @@
     </div>
   </div>
   <header class="topbar">
-    <button class="btn ghost" id="menu" type="button">Menu</button>
     <img class="brand-logo" src="./logo-pi.svg" alt="P.I.">
     <strong class="brand-abrev">P.I.</strong>
-    <label class="hud-file">Escolher ficheiro<span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
-      <input id="topFile" type="file" accept=".pdf,.txt,.csv" hidden>
+    <label class="hud-file">
+      Escolher ficheiro
+      <span class="muted" id="fileLbl">Nenhum ficheiro selecionado</span>
+      <input id="topFile" type="file" accept=".pdf,.txt,.csv,.json" hidden>
     </label>
-    <label class="hud-field">Nome<input id="topName" autocomplete="name" placeholder="Nome"></label>
-    <label class="hud-field">E-mail<input id="topEmail" type="email" autocomplete="email" placeholder="E-mail"></label>
+    <label class="hud-field">Nome
+      <input id="topName" autocomplete="name" placeholder="Nome">
+    </label>
+    <label class="hud-field">E-mail
+      <input id="topEmail" type="email" autocomplete="email" placeholder="E-mail">
+    </label>
     <span class="zoom-box">
       <button type="button" data-zoom="-">A−</button>
       <button type="button" data-zoom="+">A+</button>
-      <button type="button" data-view="barras">Barras</button>
-      <button type="button" data-view="blocos">Blocos</button>
+      <button type="button" data-view="barras" title="Ver em barras">Barras</button>
+      <button type="button" data-view="blocos" title="Ver em blocos">Blocos</button>
     </span>
   </header>
   <div class="app">
     <aside class="side" id="side">
       <div class="brand">
         <img class="brand-logo lg" src="./logo-pi.svg" alt="Planilha Inteligente">
-        <div>
+        <div class="brand-copy">
           <strong class="brand-abrev">P.I.</strong>
           <div class="brand-title" id="whoami">Planilha Inteligente</div>
         </div>
+        <button type="button" id="menu" class="side-arrow" aria-label="Recolher barra">‹</button>
       </div>
       <nav>
-        <button type="button" data-nav="comando"><i></i>Início</button>
-        <button type="button" data-nav="ciclo"><i></i>Plano de Estudos</button>
-        <button type="button" data-nav="questoes"><i></i>Questões</button>
-        <button type="button" data-nav="ciclo"><i></i>Simulados</button>
-        <button type="button" data-nav="desempenho"><i></i>Desempenho</button>
-        <button type="button" data-nav="sobre"><i></i>IA Copilot</button>
-        <button type="button" data-nav="edital"><i></i>Edital</button>
-        <button type="button" data-nav="radar"><i></i>Radar</button>
-        <button type="button" data-nav="planilha"><i></i>Mural</button>
-        <button type="button" data-nav="anki"><i></i>Anki</button>
-        <button type="button" data-nav="turma"><i></i>Turma</button>
-        <button type="button" id="logoutBtn" class="logout-btn">Sair</button>
+        <button type="button" data-nav="comando" title="Início"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg></i><span class="nav-label">Início</span></button>
+        <button type="button" data-nav="ciclo" title="Plano de Estudos"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3.5V7M16 3.5V7M4 10h16"/></svg></i><span class="nav-label">Plano de Estudos</span></button>
+        <button type="button" data-nav="questoes" title="Questões"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h11M8 12h11M8 17h11"/><path d="m4 7 1.2 1.2L7.5 6M4 12l1.2 1.2L7.5 11M4 17l1.2 1.2L7.5 16"/></svg></i><span class="nav-label">Questões</span></button>
+        <button type="button" data-nav="simulados" title="Simulados"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></i><span class="nav-label">Simulados</span></button>
+        <button type="button" data-nav="desempenho" title="Desempenho"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M10 19V7M15 19v-5M20 19V5"/></svg></i><span class="nav-label">Desempenho</span></button>
+        <button type="button" data-nav="sobre" title="IA Copilot"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.6 9 19 10.5 13.6 12 12 17.5 10.4 12 5 10.5 10.4 9z"/></svg></i><span class="nav-label">IA Copilot</span></button>
+        <button type="button" data-nav="edital" title="Edital"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l5 5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V9h5M9 13h6M9 17h4"/></svg></i><span class="nav-label">Edital</span></button>
+        <button type="button" data-nav="radar" title="Radar"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 12l5-3M12 4.5V8M4.5 12H8"/></svg></i><span class="nav-label">Radar</span></button>
+        <button type="button" data-nav="planilha" title="Mural"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.4"/></svg></i><span class="nav-label">Mural</span></button>
+        <button type="button" data-nav="anki" title="Anki"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="6" width="12" height="14" rx="2"/><path d="M5 16V6.5A2 2 0 0 1 7 4.5h9"/></svg></i><span class="nav-label">Anki</span></button>
+        <button type="button" data-nav="turma" title="Turma"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3.2A2 2 0 0 1 5 14.5z"/></svg></i><span class="nav-label">Turma</span></button>
       </nav>
+      <button type="button" id="logoutBtn" class="logout-btn" title="Sair"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6H6.5A1.5 1.5 0 0 0 5 7.5v9A1.5 1.5 0 0 0 6.5 18H9M10 12h9M15 8l4 4-4 4"/></svg></i><span class="nav-label">Sair</span></button>
+      <div class="side-tools">
+        <div class="zoom-box">
+          <button type="button" data-zoom="-">A−</button>
+          <span class="muted" id="zoomLbl">100%</span>
+          <button type="button" data-zoom="+">A+</button>
+          <button type="button" data-view="barras" title="Barras">Barras</button>
+          <button type="button" data-view="blocos" title="Blocos">Blocos</button>
+        </div>
+        <button type="button" id="backupBtn" class="backup-btn" title="Backup de segurança">
+          <span class="nav-label">Backup</span>
+        </button>
+      </div>
     </aside>
     <main class="main" id="view"></main>
     <aside class="dock" id="dock">
@@ -71,25 +97,41 @@
         <strong>Na plataforma agora</strong>
         <div class="muted" id="presenceList">só você</div>
       </div>
-      <div class="dock-head"><strong>Turma ao vivo</strong></div>
+      <div class="dock-head">
+        <strong>Turma ao vivo</strong>
+        <span class="muted">direita</span>
+      </div>
       <div class="dock-log" id="dockLog"></div>
       <div class="dock-in">
         <input id="dockIn" placeholder="Mensagem para a turma">
+        <button class="btn ghost" id="dockMic" type="button">Áudio</button>
         <button class="btn" id="dockSend" type="button">Enviar</button>
       </div>
     </aside>
   </div>
+  <script>
+    (function () {
+      var ua = navigator.userAgent || "";
+      var chrome = (/Chrome\//.test(ua) || /CriOS\//.test(ua)) && !/Edg|OPR|Opera|SamsungBrowser|Firefox|FxiOS/.test(ua);
+      var gate = document.getElementById("chrome-only");
+      var url = document.getElementById("chrome-url");
+      if (url) url.textContent = location.href;
+      if (!chrome && gate) {
+        gate.hidden = false;
+        document.documentElement.classList.add("chrome-blocked");
+      }
+    })();
+  </script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="./firebase-config.js"></script>
-  <script src="./auth-firebase.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+  <script src="./firebase-config.js?v=14"></script>
   <script src="./engine.js"></script>
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
-  <script src="./app-boot.js?v=15"></script>
-  <script src="./app-pages.js?v=15"></script>
-  <script src="./app-ui.js?v=15"></script>
+  <script src="./app.js?v=14"></script>
+  <script src="./session.js?v=14"></script>
 </body>
 </html>
