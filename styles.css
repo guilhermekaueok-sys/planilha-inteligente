@@ -239,7 +239,7 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.0
 .g4 { grid-template-columns: repeat(4, 1fr); }
 .dash { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; }
 .dash-hero { display: grid; grid-template-columns: 1.05fr .9fr 1fr; gap: 12px; }
-.dash-hero .ring-card { grid-row: span 2; display: grid; place-items: center; }
+.dash-hero .ring-card { grid-row: span 2; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
 .dash-hero .stack { display: grid; gap: 12px; }
 .hero-title h1 { margin: 0 0 4px; font-size: 1.7rem; }
 .kpi.huge { font-size: 3rem; line-height: 1; margin: 6px 0; }
@@ -266,6 +266,37 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.0
   animation: atlasDrift 7s ease-in-out infinite;
 }
 html.atlas-talk .atlas-orb { animation-duration: .7s; }
+.ring-meta { list-style: none; margin: 6px 0 0; padding: 0 8px 4px; width: 100%; }
+.ring-meta li { margin: 5px 0; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.ring-meta b { color: #7af6ff; font-weight: 750; }
+.mini-ring {
+  width: 72px; height: 72px; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  background: conic-gradient(#3ce6ff var(--p, 0%), rgba(60,230,255,.16) 0);
+  box-shadow: 0 0 14px rgba(60,230,255,.28);
+}
+.mini-ring span {
+  width: 52px; height: 52px; border-radius: 50%; background: #07101c;
+  display: grid; place-items: center; font-weight: 750; color: #e8fbff;
+}
+.disc-life { cursor: pointer; }
+.life-pop { margin: 8px 0 0; color: #d7f7ff; }
+.sim-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sim-pill { position: relative; }
+.sim-pill input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sim-pill span {
+  display: inline-flex; align-items: center; min-height: 36px;
+  padding: 6px 14px; border-radius: 999px;
+  border: 1px solid rgba(60,230,255,.35); background: #0a1220;
+  color: #d7f7ff; font-size: 15px; font-weight: 700; letter-spacing: .01em;
+}
+.sim-pill input:checked + span {
+  background: rgba(60,230,255,.22); color: #7af6ff;
+  border-color: #3ce6ff; box-shadow: 0 0 12px rgba(60,230,255,.35);
+}
+.atlas-levels { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.atlas-levels span { min-width: 96px; color: var(--muted); }
+.atlas-levels .btn { min-width: 36px; }
 @keyframes atlasDrift {
   50% { transform: scale(1.08) rotate(10deg); filter: brightness(1.2); }
 }

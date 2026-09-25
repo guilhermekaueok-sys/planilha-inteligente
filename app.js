@@ -806,6 +806,19 @@ function applyChatPlan(raw) {
   }
   return null;
 }
+function deliverAtlas(text, reply, ts, opt) {
+  const pal = S.chatWith || S.me.id;
+  S.chats[pal] = S.chats[pal] || [];
+  S.atlasLog = S.atlasLog || [];
+  S.atlasLog.push({ id: "a" + ts, uid: S.me.id, name: S.me.name || "você", text: text, ts: ts, priv: true });
+  S.atlasLog.push({ id: "a" + (ts + 1), uid: "atlas", name: "ATLAS", text: reply, ts: ts + 1, priv: true });
+  if (S.atlasLog.length > 40) S.atlasLog = S.atlasLog.slice(-40);
+  S.chats[pal].push({ from: "me", text: text, ts: ts, priv: true });
+  S.chats[pal].push({ from: "atlas", text: reply, ts: ts + 1, priv: true });
+  save(S);
+  render({ force: true });
+  if (window.ATLAS && opt && opt.voice) ATLAS.speak(reply);
+}
 function sendPlanChat(inp, opt) {
   if (!inp || !inp.value.trim()) return;
   const pal = S.chatWith || S.me.id;
@@ -813,17 +826,21 @@ function sendPlanChat(inp, opt) {
   const text = inp.value.trim();
   const ts = Date.now();
   inp.value = "";
+  const direct = !!(opt && opt.voice) || /^\s*atlas\b/i.test(text);
+  if (window.ATLAS) ATLAS._direct = direct;
   const reply = applyChatPlan(text);
   if (reply) {
-    S.atlasLog = S.atlasLog || [];
-    S.atlasLog.push({ id: "a" + ts, uid: S.me.id, name: S.me.name || "você", text: text, ts: ts, priv: true });
-    S.atlasLog.push({ id: "a" + (ts + 1), uid: "atlas", name: "ATLAS", text: reply, ts: ts + 1, priv: true });
-    if (S.atlasLog.length > 40) S.atlasLog = S.atlasLog.slice(-40);
-    S.chats[pal].push({ from: "me", text: text, ts: ts, priv: true });
-    S.chats[pal].push({ from: "atlas", text: reply, ts: ts + 1, priv: true });
-    save(S);
-    render({ force: true });
-    if (window.ATLAS && opt && opt.voice) ATLAS.speak(reply);
+    deliverAtlas(text, reply, ts, opt);
+    return;
+  }
+  if (direct && window.ATLAS && ATLAS.council) {
+    ATLAS.council(text).then((line) => {
+      deliverAtlas(text, line || "Não fechei esse pedido. Diga a disciplina, o dia e o número.", ts + 2, opt);
+    });
+    return;
+  }
+  if (direct) {
+    deliverAtlas(text, "Não fechei esse pedido. Diga a disciplina, o dia e o número.", ts, opt);
     return;
   }
   S.chats[pal].push({ from: "me", text: text, ts: ts });
@@ -974,8 +991,13 @@ const pages = {
           <div class="ring" style="--p:${pct}%"><span>
             <div class="muted">Desempenho Geral</div>
             <strong class="kpi huge">${pct}%</strong>
-            <div class="muted">${done}/${DISC.length} lançadas</div>
           </span></div>
+          <ul class="ring-meta">
+            <li><b>${pulse ? pulse.qScore : 0}%</b> Questões · ${pulse && pulse.q ? pulse.q.hits : 0} acertos em ${pulse && pulse.q ? pulse.q.n : 0} resolvidas</li>
+            <li><b>${pulse ? pulse.studied : 0}/${pulse ? pulse.planned : 0}</b> Disciplinas estudadas na meta da semana · ${pulse ? pulse.missed : 0} não estudadas</li>
+            <li><b>${pulse ? pulse.hoursDone : 0}h</b> Horas batidas de ${pulse ? pulse.hoursPlan : 0}h previstas</li>
+            <li><b>${pulse && pulse.notaAvg != null ? pulse.notaAvg : "—"}</b> Notas da planilha · grade ${pulse ? pulse.fill : 0}% preenchida</li>
+          </ul>
         </div>
         <div class="stack">
           <div class="card">
@@ -1019,22 +1041,25 @@ const pages = {
     `;
   },
   desempenho() {
+    const open = S.openDisc || "";
     return `
       <p class="kicker">HISTÓRICO DE DESEMPENHO DA JORNADA</p>
       <h1>HISTÓRICO DE DESEMPENHO DA JORNADA</h1>
-      <p class="sub">Cada barra é o seu acerto. Sem lançamento, fica sem dados.</p>
+      <p class="sub">Um volume por disciplina. Clique para ver acertos, erros e o total desde o primeiro registro.</p>
       <div class="disc-board">
       ${DISC.map((d) => {
-        const r = rate(d.id);
-        const pct = r == null ? 0 : Math.round(r * 100);
-        const lv = level(r);
-        return `<article class="card disc-item">
-          <div class="row" style="justify-content:space-between">
-            <strong>${d.sigla}</strong>
-            <span class="${lv.cls}">${r == null ? "sem dados" : pct + "%"}</span>
+        const life = window.ATLAS ? ATLAS.journey(d.id) : { n: 0, hits: 0, wrong: 0, pct: 0 };
+        const on = open === d.id;
+        return `<article class="card disc-item disc-life${on ? " on" : ""}" data-life="${d.id}">
+          <div class="row">
+            <div class="mini-ring" style="--p:${life.pct}%"><span>${life.pct}%</span></div>
+            <div>
+              <strong>${d.sigla}</strong>
+              <div class="muted">${d.name}</div>
+            </div>
           </div>
-          <div class="muted">${d.name}</div>
-          <div class="bar"><i style="width:${r == null ? 0 : Math.max(pct, 4)}%"></i></div>
+          <div class="bar"><i style="width:${life.n ? Math.max(life.pct, 4) : 0}%"></i></div>
+          ${on ? `<p class="life-pop">${life.n ? "Desde o primeiro registro: " + life.n + " resolvidas, " + life.hits + " acertos, " + life.wrong + " erros." : "Ainda sem registro nesta disciplina."}</p>` : ""}
         </article>`;
       }).join("")}
       </div>
@@ -1346,7 +1371,6 @@ const pages = {
   sobre() {
     const a = window.ATLAS ? ATLAS.prefs() : { simpatia: 2, interacao: 2, criatividade: 1, poder: 2 };
     const p = window.ATLAS ? ATLAS.pulse() : { geral: 0, qScore: 0, hScore: 0, dScore: 0 };
-    const slider = (id, lab, v) => `<label class="muted">${lab} <input id="${id}" type="range" min="0" max="3" value="${v}"> <b>${v}</b></label>`;
     return `
       <p class="kicker">ATLAS</p>
       <h1>ATLAS</h1>
@@ -1357,11 +1381,16 @@ const pages = {
         <div class="row" style="margin-top:8px">
           <button class="btn" id="voiceAsk" type="button">Falar com o ATLAS</button>
         </div>
-        ${slider("atlasSim", "Simpatia", a.simpatia)}
-        ${slider("atlasInt", "Interação", a.interacao)}
-        ${slider("atlasCri", "Criatividade", a.criatividade)}
-        ${slider("atlasPod", "Poder de acesso", a.poder)}
-        <p class="muted">Poder 2 lança hora, questão e disciplina. Abaixo disso o ATLAS só orienta.</p>
+        ${["simpatia", "interacao", "criatividade", "poder"].map((key) => {
+          const lab = { simpatia: "Simpatia", interacao: "Interação", criatividade: "Criatividade", poder: "Poder" }[key];
+          return `<div class="atlas-levels"><span>${lab}</span>${[0, 1, 2, 3].map((n) => `<button type="button" class="btn ${Number(a[key]) === n ? "" : "ghost"}" data-atlaspref="${key}" data-level="${n}">${n}</button>`).join("")}</div>`;
+        }).join("")}
+        <p class="muted">O botão fala a escolha. Poder alto altera a planilha só quando você pede direto.</p>
+        <div class="row" style="margin-top:8px">
+          <label class="muted">Gemini <input id="atlasGemini" type="password" placeholder="${a.gemini ? "chave salva neste aparelho" : "cole a chave"}" autocomplete="off"></label>
+          <label class="muted">ChatGPT <input id="atlasOpenai" type="password" placeholder="${a.openai ? "chave salva neste aparelho" : "cole a chave"}" autocomplete="off"></label>
+        </div>
+        <p class="muted">As duas conversam para fechar o pedido. Sem chave, o ATLAS executa e responde por voz mesmo assim. A chave não sai deste aparelho.</p>
       </div>
       <div class="card">
         <p><strong>Importância</strong> = 65% pontos oficiais (em 90) + 25% presença no edital da amostra + 10% “já caiu em prova”.</p>
@@ -1371,7 +1400,7 @@ const pages = {
   },
   simulados() {
     const logs = Array.isArray(S.simLogs) ? S.simLogs : [];
-    const opts = DISC.map((d) => `<label class="muted"><input type="checkbox" data-simdisc="${d.id}"> ${d.sigla}</label>`).join("");
+    const opts = DISC.map((d) => `<label class="sim-pill" title="${d.name}"><input type="checkbox" data-simdisc="${d.id}"><span>${d.sigla}</span></label>`).join("");
     const rows = logs.map((r) => {
       const nomes = (r.discs || []).map((id) => {
         const d = DISC.find((x) => x.id === id);
@@ -1397,7 +1426,7 @@ const pages = {
           <label class="muted">Pontos <input id="simPts" type="number" min="0" value="0"></label>
           <label class="muted">Total <input id="simTot" type="number" min="0" value="0"></label>
         </div>
-        <div class="row" style="margin-top:8px;flex-wrap:wrap">${opts}</div>
+        <div class="sim-pills">${opts}</div>
         <button class="btn" id="simAdd" type="button" style="margin-top:12px">Registrar simulado</button>
       </div>
       <div style="margin-top:12px">${rows || `<p class="muted">Nenhum simulado registrado.</p>`}</div>
@@ -1766,7 +1795,23 @@ document.addEventListener("click", (e) => {
     }
   }
   if (e.target.id === "voiceAsk" || (e.target.closest && e.target.closest("#voiceAsk"))) {
-    if (window.ATLAS) ATLAS.listen();
+    if (window.ATLAS) { ATLAS.prime(); ATLAS.listen(); }
+  }
+  const prefBtn = e.target.closest && e.target.closest("[data-atlaspref]");
+  if (prefBtn && window.ATLAS) {
+    const line = ATLAS.setLevel(prefBtn.dataset.atlaspref, prefBtn.dataset.level);
+    save(S);
+    render({ force: true });
+    ATLAS.prime();
+    ATLAS.speak(line);
+    return;
+  }
+  const life = e.target.closest && e.target.closest("[data-life]");
+  if (life && page === "desempenho") {
+    S.openDisc = S.openDisc === life.dataset.life ? "" : life.dataset.life;
+    save(S, true);
+    render({ force: true });
+    return;
   }
   if (e.target.id === "chatSend" || e.target.id === "dockSend") {
     const pal = S.chatWith || S.me.id;
@@ -1845,6 +1890,13 @@ document.addEventListener("input", (e) => {
   if (e.target.dataset && e.target.dataset.sheet) paintSheetTotals();
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "atlasGemini" || e.target.id === "atlasOpenai") {
+    if (!S.atlas) S.atlas = { simpatia: 2, interacao: 2, criatividade: 1, poder: 3 };
+    const val = String(e.target.value || "").trim();
+    if (val) S.atlas[e.target.id === "atlasGemini" ? "gemini" : "openai"] = val;
+    save(S, true);
+    return;
+  }
   if (e.target.id === "userPhotoFile" && e.target.files && e.target.files[0]) {
     const file = e.target.files[0];
     const reader = new FileReader();
