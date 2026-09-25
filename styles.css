@@ -26,31 +26,24 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: -4%;
+  inset: -18%;
   z-index: 0;
   pointer-events: none;
-  background-color: #06101c;
+  background-color: #050814;
   background-image:
-    linear-gradient(165deg, #1a6cff, #3ce6ff 48%, #0e3a66),
+    radial-gradient(ellipse 48% 46% at 58% 42%, rgba(5,10,22,0) 0%, rgba(5,10,22,.12) 62%, rgba(5,8,20,.62) 84%),
     url("./fundo-nebulosa.jpg");
   background-repeat: no-repeat;
-  background-size: auto, 100%;
-  background-position: center, 50% 46%;
-  background-blend-mode: color, normal;
-  filter: blur(8px) brightness(.9);
-  animation: nebulaDrift 14s ease-in-out infinite;
+  background-size: auto, cover;
+  background-position: center, 52% 40%;
+  filter: blur(16px) saturate(.8) brightness(.82) hue-rotate(8deg);
+  transform: translate3d(0, 0, 0) scale(1.12);
+  backface-visibility: hidden;
+  animation: nebulaDrift 32s ease-in-out infinite alternate;
 }
 @keyframes nebulaDrift {
-  0%, 100% {
-    background-position: center, 46% 52%;
-    transform: scale(1);
-    filter: blur(8px) brightness(.82);
-  }
-  50% {
-    background-position: center, 56% 40%;
-    transform: scale(1.05);
-    filter: blur(8px) brightness(1.14);
-  }
+  from { transform: translate3d(0, 0, 0) scale(1.12); }
+  to { transform: translate3d(-1.8%, 1%, 0) scale(1.16); }
 }
 body::after {
   content: "";
@@ -60,7 +53,6 @@ body::after {
     linear-gradient(90deg, rgba(60,230,255,.04) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(circle at 50% 30%, #000 20%, transparent 75%);
-  animation: gridDrift 28s linear infinite;
 }
 .app, .topbar { position: relative; z-index: 1; }
 #chrome-only {
@@ -390,7 +382,7 @@ input:focus, select:focus, textarea:focus {
   to { opacity: 1; transform: none; }
 }
 @keyframes pulseGlow {
-  50% { box-shadow: 0 0 42px rgba(60,230,255,.45); }
+  50% { transform: scale(1.02); }
 }
 @keyframes fillBar {
   from { transform: scaleX(0); }
@@ -403,19 +395,6 @@ input:focus, select:focus, textarea:focus {
 @keyframes navGlow {
   50% { box-shadow: inset 3px 0 0 var(--mint), 0 0 16px rgba(60,230,255,.2); }
 }
-.main > .kicker,
-.main > h1,
-.main > h2,
-.main > h3,
-.main > .sub,
-.main > .card,
-.main > .dash,
-.main > .grid {
-  animation: rise .45s ease both;
-}
-.main > .dash { animation-delay: .06s; }
-.main > .card:nth-of-type(1) { animation-delay: .08s; }
-.main > .card:nth-of-type(2) { animation-delay: .14s; }
 .sheet-wrap, .sheet-wrap * { animation: none !important; }
 .ring { animation: pulseGlow 2.8s ease-in-out infinite; }
 .bar > i {
@@ -424,7 +403,7 @@ input:focus, select:focus, textarea:focus {
 }
 .side nav button { transition: background .2s ease, color .2s ease, box-shadow .2s ease, padding-left .2s ease; }
 .side nav button:hover { padding-left: 16px; color: var(--fg); }
-.side nav button.on { animation: navGlow 2.4s ease-in-out infinite; }
+.side nav button.on { box-shadow: inset 3px 0 0 var(--mint), inset 0 0 0 1px rgba(60,230,255,.35); }
 .btn, .btn.ghost {
   transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease, filter .15s ease;
 }
