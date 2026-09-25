@@ -523,7 +523,7 @@
     if (!models.length) {
       return Promise.resolve({ say: "Nenhuma chave neste aparelho. Cole a chave da IA e deixe o botão aceso.", precision: 0, votes: [] });
     }
-    var prompt = "Responda em português, curto e direto, para um concurseiro. Não invente dado que não esteja no pedido. Pedido: " + raw;
+    var prompt = "Responda em português do Brasil, direto, à pergunta do usuário. Pode explicar matéria, lei, jurisprudência, dica de prova e qualquer dúvida. Não exija disciplina, dia ou número. Não recuse a pergunta. Não invente número da planilha dele. Pergunta: " + raw;
     return Promise.all(models.map(function (m) {
       return askModel(m.which, m.key, prompt).then(function (text) {
         return { name: m.id, text: String(text || "").trim() };
@@ -546,6 +546,8 @@
   function consult(raw) {
     var local = null;
     try { local = exec(raw); } catch (e) { local = null; }
+    if (local && /Não fechei|Repita com o nome|Diga a disciplina|Diga simpatia/.test(local)) local = null;
+    if (local) return Promise.resolve({ say: local, precision: 100, votes: ["local"] });
     return askAll(raw).then(function (pack) {
       pack = pack || { say: "", precision: 0, votes: [] };
       var precision = Math.max(0, Math.min(100, Math.round(Number(pack.precision) || 0)));
@@ -572,7 +574,7 @@
       { id: "copilot", which: "copilot", key: oauthMem.copilot || p.copilot },
     ].filter(function (m) { return on[m.id] !== false && m.key; });
     if (!models.length) {
-      var solo = { say: local || "Diga a matéria, o dia e o número. Sem chave, eu executo o pedido direto nos dados de estudo.", precision: local ? 100 : 0, votes: [] };
+      var solo = { say: local || "Sem chave neste aparelho, eu só consigo lançar o que você pedir com matéria, dia e número. Para pesquisar, cole a chave da IA.", precision: local ? 100 : 0, votes: [] };
       if (local) notifyWebhook(solo, raw);
       return Promise.resolve(solo);
     }
@@ -588,7 +590,7 @@
         if (plan) plans.push({ name: r.name, plan: plan });
       });
       if (!local && plans[0]) applyOps(safeOps(plans[0].plan.actions));
-      var say = local || (plans[0] && plans[0].plan.say) || "Não fechei esse pedido. Diga a disciplina, o dia e o número.";
+      var say = local || (plans[0] && plans[0].plan.say) || "Não consegui lançar isso na planilha. Se for uma dúvida, pergunte de novo.";
       var precision = plans.length ? (plans.length === 1 ? 100 : Math.round(100 * plans.filter(function (x) { return (x.plan.say || "") === (plans[0].plan.say || ""); }).length / plans.length)) : (local ? 100 : 0);
       var pack = { say: say, precision: precision, votes: plans.map(function (x) { return x.name; }) };
       notifyWebhook(pack, raw);

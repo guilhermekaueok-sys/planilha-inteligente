@@ -1085,18 +1085,18 @@ function sendPlanChat(inp, opt) {
   const direct = !!(opt && opt.voice) || /^\s*(atlas|ias|pergunte|gemini|claude|copilot)\b/i.test(text);
   if (window.ATLAS) ATLAS._direct = direct;
   const reply = applyChatPlan(text);
-  if (reply) {
+  if (reply && !/^Não\b/.test(reply)) {
     deliverAtlas(text, reply, ts, opt);
     return;
   }
-  if (direct && window.ATLAS && ATLAS.act) {
-    ATLAS.act(text).then((pack) => {
-      deliverAtlas(text, (pack && pack.say) || "Não fechei esse pedido. Diga a disciplina, o dia e o número.", ts + 2, opt);
+  if ((direct || (opt && opt.voice)) && window.ATLAS && ATLAS.consult) {
+    ATLAS.consult(text).then((pack) => {
+      deliverAtlas(text, (pack && pack.say) || "As IAs não responderam. Confira a chave neste aparelho.", ts, opt);
     });
     return;
   }
   if (direct) {
-    deliverAtlas(text, "Não fechei esse pedido. Diga a disciplina, o dia e o número.", ts, opt);
+    deliverAtlas(text, "As IAs não responderam. Confira a chave neste aparelho.", ts, opt);
     return;
   }
   S.chats[pal].push({ from: "me", text: text, ts: ts });
@@ -2079,7 +2079,7 @@ document.addEventListener("click", (e) => {
       new Promise((resolve) => setTimeout(() => resolve({ say: "O pedido passou do tempo. Tente de novo.", precision: 0, votes: [] }), 28000)),
     ]).then((pack) => {
       if (ticket !== iaTicket) return;
-      S.iaLast = pack || { say: "Não fechei esse pedido.", precision: 0, votes: [] };
+      S.iaLast = pack || { say: "As IAs não responderam. Confira a chave neste aparelho.", precision: 0, votes: [] };
       save(S);
       fillIaModal(S.iaLast);
     }).catch(() => {
