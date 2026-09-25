@@ -191,7 +191,7 @@ function restoreBackup(text, fileName) {
   const state = data && data.kind === "pi-backup" && data.state;
   const lbl = $("fileLbl");
   if (!state || typeof state !== "object") {
-    if (lbl) lbl.textContent = fileName || "Nenhum ficheiro selecionado";
+    if (lbl) lbl.textContent = fileName || "Nenhum arquivo selecionado";
     return;
   }
   S = Object.assign(defaultState(), state);
@@ -1077,7 +1077,7 @@ const pages = {
           <div class="wave">${"<i></i>".repeat(18)}</div>
           <button class="voice-btn" id="voiceAsk" type="button">
             <strong>${userName() || "Seu nome"}</strong>
-            <span>Peça por voz. Ex.: Atlas, adicione 2 horas de Direito Administrativo na terça.</span>
+            <span>Peça por voz. Ex.: adicione 2 horas de Direito Administrativo na terça.</span>
           </button>
         </div>
         <div class="card">
@@ -1128,7 +1128,7 @@ const pages = {
     return `
       <p class="kicker">RADAR · ${stamp}</p>
       <h1>RADAR DE CONCURSOS</h1>
-      <p class="sub">Só notícias. Abertos, iminentes ou em prova. O que passar de 12 dias sai sozinho.</p>
+      <p class="sub">Só notícias: concursos abertos, iminentes ou com prova marcada. O que passar de 12 dias sai sozinho.</p>
       <div class="news-board">${window.PIRadar ? PIRadar.page() : ""}</div>
     `;
   },
@@ -1206,7 +1206,7 @@ const pages = {
     return `
       <p class="kicker">PLANO DE ESTUDOS · semana ${S.week}</p>
       <h1 class="plan-title">PLANEJAMENTO SEMANAL</h1>
-      <p class="sub">Acione manualmente ou peça ao Atlas.</p>
+      <p class="sub">Acione manualmente ou peça às IAs.</p>
       <div class="row" style="margin-bottom:12px">
         <button class="btn ghost" id="wprev">Semana −</button>
         <button class="btn ghost" id="wnext">Semana +</button>
@@ -1282,9 +1282,9 @@ const pages = {
       <div class="room-view room-turma">
       <div class="card">
         <div class="muted">MESTRE DESTE CHAT</div>
-        <p class="muted">O Grok atualiza o arquivo no seu Drive. Aqui o app puxa sem novo zip. Deixe o arquivo “qualquer um com o link”.</p>
+        <p class="muted">O Grok atualiza o arquivo no seu Drive. Aqui o app puxa sem novo zip. Deixe o arquivo como “qualquer pessoa com o link”.</p>
         <input id="masterUrl" value="${(S.masterUrl || "").replace(/"/g, "")}" style="width:100%;margin:8px 0">
-        <textarea id="masterPack" class="chatbox" placeholder="Ou cole o pacote VGCFG. que o Grok mandar" style="width:100%"></textarea>
+        <textarea id="masterPack" class="chatbox" placeholder="Ou cole o pacote VGCFG. que o Grok enviar" style="width:100%"></textarea>
         <div class="row" style="margin-top:8px">
           <button class="btn" id="masterPull">Atualizar do mestre</button>
           <button class="btn ghost" id="masterPaste">Aplicar pacote</button>
@@ -1771,7 +1771,7 @@ document.addEventListener("click", (e) => {
     const msg = $("masterMsg");
     if ($("masterUrl")) { S.masterUrl = $("masterUrl").value.trim(); save(S, true); }
     pullMestre().then(() => { if (msg) msg.textContent = "Mestre aplicado."; }).catch(() => {
-      if (msg) msg.textContent = "Não leu o Drive. Libere o link ou cole o pacote VGCFG.";
+      if (msg) msg.textContent = "Não foi possível ler o Drive. Libere o link ou cole o pacote VGCFG.";
     });
   }
   if (e.target.id === "masterPaste") {
@@ -1812,7 +1812,7 @@ document.addEventListener("click", (e) => {
       msg.textContent = snap.name + " entrou no placar.";
       render();
     } catch {
-      msg.textContent = "Não deu para ler o código. Peça um VG1. novo.";
+      msg.textContent = "Não foi possível ler o código. Peça um código VG1. novo.";
     }
   }
   const iaBtn = e.target.closest && e.target.closest("[data-ia]");

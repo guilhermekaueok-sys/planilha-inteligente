@@ -1,17 +1,17 @@
+import { guard } from "../lib/api-firewall.js";
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "method" });
-    return;
-  }
+  if (!guard(req, res, { methods: ["POST"], limit: 20, max: 12000, requireOrigin: true })) return;
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const key = String(body.key || "");
   const prompt = String(body.prompt || "").slice(0, 8000);
-  if (!key || !prompt) {
+  const which = body.which === "gemini" || body.which === "claude" || body.which === "copilot" ? body.which : "openai";
+  if (!key || !prompt || /[\r\n]/.test(key)) {
     res.status(400).json({ error: "pedido incompleto" });
     return;
   }
   try {
-    if (body.which === "gemini") {
+    if (which === "gemini") {
       const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(key), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       res.status(r.ok ? 200 : 502).json({ text: text, error: j.error || null });
       return;
     }
-    if (body.which === "claude") {
+    if (which === "claude") {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       res.status(r.ok ? 200 : 502).json({ text: text, error: j.error || null });
       return;
     }
-    if (body.which === "copilot") {
+    if (which === "copilot") {
       const r = await fetch("https://api.githubcopilot.com/chat/completions", {
         method: "POST",
         headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },

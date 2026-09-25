@@ -30,7 +30,7 @@
     {
       key: "ape", source: "APE Concursos", st: "FONTE", date: "2026-09-25",
       title: "Portal sem edição acessível hoje",
-      text: "A busca diária não abriu o site da APE. Nenhuma manchete foi inventada. O card troca quando a fonte publicar.",
+      text: "A busca diária não abriu o site da APE. Nenhuma manchete foi inventada. O card muda quando a fonte publicar uma edição.",
       href: "https://apeconcursos.com.br/",
     },
   ];

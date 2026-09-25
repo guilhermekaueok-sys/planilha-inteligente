@@ -1,3 +1,5 @@
+import { guard } from "../lib/api-firewall.js";
+
 var ALLOW = { hours: 1, done: 1, log: 1, sim: 1, nota: 1, week: 1, topic: 1, topicadd: 1, drop: 1, edital: 1 };
 
 function clean(list) {
@@ -5,15 +7,9 @@ function clean(list) {
 }
 
 export default function handler(req, res) {
+  if (!guard(req, res, { methods: ["GET", "POST"], limit: 20, max: 8000 })) return;
   if (req.method === "GET") {
-    res.status(200).json({
-      ok: true,
-      exemplo: "veja /exemplo-ia.js",
-    });
-    return;
-  }
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "method" });
+    res.status(200).json({ ok: true, exemplo: "veja /exemplo-ia.js" });
     return;
   }
   var env = process.env.PI_WEBHOOK_SECRET;
