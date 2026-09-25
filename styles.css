@@ -26,20 +26,31 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: -14%;
+  inset: -4%;
   z-index: 0;
   pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(5,8,20,.55), rgba(5,8,20,.28) 46%, rgba(5,8,20,.6)),
-    radial-gradient(70% 60% at 62% 42%, transparent, rgba(5,8,20,.45)),
-    url("./fundo-nebulosa.jpg") center 40% / cover no-repeat;
-  filter: blur(18px) saturate(1.25) brightness(.9);
-  transform: scale(1.06);
-  animation: nebulaDrift 56s ease-in-out infinite alternate;
+  background-color: #06101c;
+  background-image:
+    linear-gradient(165deg, #1a6cff, #3ce6ff 48%, #0e3a66),
+    url("./fundo-nebulosa.jpg");
+  background-repeat: no-repeat;
+  background-size: auto, 100%;
+  background-position: center, 50% 46%;
+  background-blend-mode: color, normal;
+  filter: blur(8px) brightness(.9);
+  animation: nebulaDrift 14s ease-in-out infinite;
 }
 @keyframes nebulaDrift {
-  from { transform: scale(1.06) translate3d(0, 0, 0); }
-  to { transform: scale(1.14) translate3d(-2.2%, -1.4%, 0); }
+  0%, 100% {
+    background-position: center, 46% 52%;
+    transform: scale(1);
+    filter: blur(8px) brightness(.82);
+  }
+  50% {
+    background-position: center, 56% 40%;
+    transform: scale(1.05);
+    filter: blur(8px) brightness(1.14);
+  }
 }
 body::after {
   content: "";
