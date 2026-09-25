@@ -633,6 +633,103 @@
       return say;
     }).catch(function () { return null; });
   }
+  function clipEdital(text) {
+    var t = String(text || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+    var low = t.toLowerCase();
+    var marks = ["conteúdo programático", "conteudo programatico", "dos conteúdos", "dos conteudos", "conteúdo da prova", "anexo"];
+    var idx = -1;
+    marks.forEach(function (k) {
+      var i = low.indexOf(k);
+      if (i >= 0 && (idx < 0 || i < idx)) idx = i;
+    });
+    var head = t.slice(0, 7000);
+    var prog = idx >= 0 ? t.slice(Math.max(0, idx - 200), idx + 12000) : t.slice(7000, 16000);
+    return (head + "\n\n---\n\n" + prog).slice(0, 16000);
+  }
+  function shapeEdital(raw) {
+    var j = raw;
+    if (typeof raw === "string") {
+      var m = raw.match(/\{[\s\S]*\}/);
+      if (!m) return null;
+      try { j = JSON.parse(m[0]); } catch (e) { return null; }
+    }
+    if (!j || typeof j !== "object") return null;
+    function clean(v) { return String(v || "").replace(/\s+/g, " ").trim().slice(0, 180); }
+    function blocked(name) {
+      return /inscri[cç]|deferiment|comprovante|disposi[cç]|vagas reserv|avalia[cç]|taxa|r\$|cento e|eliminat|do cargo|da inscri|preliminar/i.test(name);
+    }
+    var discs = [];
+    var topics = [];
+    (Array.isArray(j.disciplinas) ? j.disciplinas : []).forEach(function (d) {
+      var name = clean(d && (d.nome || d.name || d.disciplina));
+      if (!name || name.length < 3 || blocked(name)) return;
+      var id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "").slice(0, 24);
+      if (!id || discs.some(function (x) { return x.id === id; })) return;
+      var bits = name.split(/\s+/).filter(function (w) { return w.length > 2; }).slice(0, 3);
+      discs.push({ id: id, sigla: (bits.map(function (w) { return w[0]; }).join("") || name.slice(0, 3)).toUpperCase(), name: name, pesoOf: 1, pts: 1, q: 0, editais: 1, provas: 1, n: 1 });
+      var assuntos = Array.isArray(d.assuntos) ? d.assuntos : [];
+      assuntos.forEach(function (a) {
+        var topic = clean(a);
+        if (!topic || blocked(topic)) return;
+        topics.push({ id: "u" + topics.length, disc: name, d: id, t: topic });
+      });
+    });
+    var taxa = clean(j.taxa);
+    if (taxa && !/r\$|\d/.test(taxa.toLowerCase())) taxa = "";
+    return {
+      meta: {
+        cargo: clean(j.cargo),
+        prova: clean(j.prova || j.data),
+        banca: clean(j.banca),
+        inscricao: clean(j.inscricao),
+        taxa: taxa,
+      },
+      discs: discs,
+      topics: topics,
+    };
+  }
+  function lerEdital(text) {
+    var clip = clipEdital(text);
+    if (clip.length < 40) return Promise.resolve({ meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "O arquivo não trouxe texto para ler." }, discs: [], topics: [] });
+    var p = prefs();
+    var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
+    var models = [
+      { id: "chatgpt", which: "openai", key: oauthMem.chatgpt || p.chatgpt || p.openai },
+      { id: "claude", which: "claude", key: oauthMem.claude || p.claude },
+      { id: "gemini", which: "gemini", key: oauthMem.gemini || p.gemini },
+      { id: "copilot", which: "copilot", key: oauthMem.copilot || p.copilot },
+    ].filter(function (m) { return on[m.id] !== false && m.key; });
+    if (!models.length) {
+      return Promise.resolve({ meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "Nenhuma chave neste aparelho. Cole a chave da IA para ler o edital." }, discs: [], topics: [] });
+    }
+    var prompt = "Você lê edital de concurso público no Brasil. Devolva somente JSON, sem markdown, neste formato: {\"cargo\":\"\",\"prova\":\"\",\"banca\":\"\",\"inscricao\":\"\",\"taxa\":\"\",\"disciplinas\":[{\"nome\":\"\",\"assuntos\":[\"\"]}]}. cargo é o cargo do concurso, não título de seção. prova é a data da prova. banca é a organizadora. inscricao é o período de inscrição. taxa é só o valor da taxa de inscrição do cargo. disciplinas são só o conteúdo programático da prova, com os assuntos de cada matéria. Proibido colocar inscrição, taxa, vagas, reserva, deficiência, saúde, deferimento, comprovante ou disposições gerais dentro de disciplinas. Não invente o que não estiver no texto. Se não achar, deixe vazio. TEXTO:\n" + clip;
+    return Promise.all(models.map(function (m) {
+      return askModel(m.which, m.key, prompt).then(function (out) {
+        return shapeEdital(out);
+      }).catch(function () { return null; });
+    })).then(function (packs) {
+      var ok = packs.filter(function (x) { return x && (x.discs.length || x.meta.cargo || x.meta.taxa); });
+      if (!ok.length) {
+        return { meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "As IAs não fecharam o resumo. Confira a chave e anexe de novo." }, discs: [], topics: [] };
+      }
+      ok.sort(function (a, b) { return (b.topics.length + b.discs.length) - (a.topics.length + a.discs.length); });
+      var best = ok[0];
+      ["cargo", "prova", "banca", "inscricao", "taxa"].forEach(function (k) {
+        if (best.meta[k]) return;
+        var hits = {};
+        ok.forEach(function (row) {
+          var v = row.meta[k];
+          if (v) hits[v] = (hits[v] || 0) + 1;
+        });
+        var top = "";
+        var n = 0;
+        Object.keys(hits).forEach(function (v) { if (hits[v] > n) { n = hits[v]; top = v; } });
+        best.meta[k] = top;
+      });
+      best.meta.aviso = "";
+      return best;
+    });
+  }
   if (window.speechSynthesis) {
     window.speechSynthesis.onvoiceschanged = function () { chooseVoice(); };
   }
@@ -643,6 +740,8 @@
     intent: intent,
     exec: exec,
     lerTexto: lerTexto,
+    lerEdital: lerEdital,
+    shapeEdital: shapeEdital,
     vertical: vertical,
     card: card,
     radarHtml: radarHtml,

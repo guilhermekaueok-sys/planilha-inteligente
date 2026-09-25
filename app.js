@@ -107,6 +107,16 @@ function purgeOldEdital(s) {
     if (s.me) s.me.exam = "";
   }
   if (!Array.isArray(s.editalDiscs)) s.editalDiscs = [];
+  var topics = Array.isArray(s.userTopics) ? s.userTopics : [];
+  if (topics.length) {
+    var badRe = /inscri|deferiment|comprovante|disposi|vagas reserv|avalia|r\$|taxa|cento e|eliminat/i;
+    var badCount = topics.filter(function (t) { return badRe.test((t.disc || "") + " " + (t.t || "")); }).length;
+    if (badCount >= Math.ceil(topics.length * 0.5)) {
+      s.userTopics = [];
+      s.editalDiscs = [];
+      if (s.editalLido) s.editalLido.taxa = "";
+    }
+  }
   return s;
 }
 function load() {
@@ -910,6 +920,8 @@ function applyParsedEdital(parsed) {
   S.editalDiscs = parsed.discs || [];
   S.userTopics = parsed.topics || [];
   S.editalLido = parsed.meta || {};
+  S.editalAviso = (parsed.meta && parsed.meta.aviso) || "";
+  if (S.editalLido.aviso) delete S.editalLido.aviso;
   S.editalDiscs.forEach((d) => { ids[d.id] = 1; });
   (S.board || []).forEach((meta) => (meta.slots || []).forEach((slot) => {
     Object.keys(slot || {}).forEach((k) => {
@@ -1346,8 +1358,19 @@ const pages = {
   edital() {
     const saved = S.editalLido || null;
     const topics = Array.isArray(S.userTopics) ? S.userTopics : [];
-    const fields = saved ? ["cargo", "prova", "banca", "inscricao", "taxa"].map((k) => `<p><strong>${k}.</strong> ${saved[k] || "—"}</p>`).join("") : `<p>Nenhum edital. A planilha está em branco. Anexe um arquivo para começar do zero.</p>`;
-    const list = topics.length ? topics.map((t) => `<div class="topic"><strong>${t.disc || "Assunto"}</strong><p>${t.t}</p></div>`).join("") : `<p class="muted">O verticalizado aparece aqui depois que você anexar o edital novo.</p>`;
+    const fields = saved ? ["cargo", "prova", "banca", "inscricao", "taxa"].map((k) => `<p><strong>${k}.</strong> ${iaText(saved[k] || "—")}</p>`).join("") : `<p>Nenhum edital. A planilha está em branco. Anexe um arquivo para começar do zero.</p>`;
+    const groups = {};
+    topics.forEach((t) => {
+      const name = t.disc || "Assunto";
+      groups[name] = groups[name] || [];
+      if (t.t) groups[name].push(t.t);
+    });
+    const names = Object.keys(groups);
+    const list = S.editalLendo
+      ? `<p class="muted">As IAs estão lendo o edital.</p>`
+      : names.length
+        ? names.map((name) => `<div class="topic"><strong>${iaText(name)}</strong><p>${groups[name].map((x) => iaText(x)).join("<br>")}</p></div>`).join("")
+        : `<p class="muted">${iaText(S.editalAviso || "O verticalizado aparece aqui depois que você anexar o edital novo.")}</p>`;
     return `
       <p class="kicker">EDITAL</p>
       <h1>EDITAL</h1>
@@ -2202,12 +2225,23 @@ document.addEventListener("change", (e) => {
     const file = e.target.files[0];
     const reader = new FileReader();
     const finish = (text) => {
-      const parsed = parseEditalText(text);
-      if (!parsed.discs.length && text.length < 40) return;
-      applyParsedEdital(parsed);
-      save(S);
+      if (!text || String(text).length < 40) return;
+      S.editalLendo = true;
+      S.editalAviso = "";
+      S.userTopics = [];
+      S.editalDiscs = [];
+      S.editalLido = { cargo: "", prova: "", banca: "", inscricao: "", taxa: "" };
       page = "edital";
       render({ force: true });
+      const done = (parsed) => {
+        S.editalLendo = false;
+        applyParsedEdital(parsed || { meta: { aviso: "As IAs não fecharam o resumo. Confira a chave e anexe de novo." }, discs: [], topics: [] });
+        save(S);
+        page = "edital";
+        render({ force: true });
+      };
+      if (window.ATLAS && ATLAS.lerEdital) ATLAS.lerEdital(text).then(done).catch(() => done(null));
+      else done(null);
     };
     reader.onload = () => {
       if (/\.pdf$/i.test(file.name)) {
