@@ -981,6 +981,17 @@ const pages = {
     const dir = dirXs.length ? Math.round(dirXs.reduce((a, b) => a + b, 0) / dirXs.length * 100) : 0;
     const leg = rate("legmun");
     const peso = Math.round(importance(top) * 100);
+    const edital = (() => {
+      const list = TOPICS || [];
+      if (!list.length) return { pct: 0, done: 0, n: 0 };
+      const w = { dominado: 1, revisar: 0.75, andamento: 0.45, pendente: 0 };
+      const sum = list.reduce((a, t) => a + (w[(S.topic && S.topic[t.id]) || "pendente"] || 0), 0);
+      const done = list.filter((t) => (S.topic && S.topic[t.id] && S.topic[t.id] !== "pendente")).length;
+      return { pct: Math.round((sum / list.length) * 100), done, n: list.length };
+    })();
+    const qScore = pulse ? pulse.qScore : 0;
+    const dScore = pulse && pulse.planned ? pulse.dScore : 0;
+    const hScore = pulse && pulse.hoursPlan ? pulse.hScore : 0;
     return `
       <div class="hero-title">
         <h1>DESEMPENHO GERAL</h1>
@@ -989,14 +1000,31 @@ const pages = {
       <div class="dash-hero">
         <div class="card ring-card">
           <div class="ring" style="--p:${pct}%"><span>
-            <div class="muted">Desempenho Geral</div>
             <strong class="kpi huge">${pct}%</strong>
+            <div class="muted">Desempenho Geral</div>
           </span></div>
+          <p class="ring-area">Desempenho em outras áreas da plataforma</p>
           <ul class="ring-meta">
-            <li><b>${pulse ? pulse.qScore : 0}%</b> Questões · ${pulse && pulse.q ? pulse.q.hits : 0} acertos em ${pulse && pulse.q ? pulse.q.n : 0} resolvidas</li>
-            <li><b>${pulse ? pulse.studied : 0}/${pulse ? pulse.planned : 0}</b> Disciplinas estudadas na meta da semana · ${pulse ? pulse.missed : 0} não estudadas</li>
-            <li><b>${pulse ? pulse.hoursDone : 0}h</b> Horas batidas de ${pulse ? pulse.hoursPlan : 0}h previstas</li>
-            <li><b>${pulse && pulse.notaAvg != null ? pulse.notaAvg : "—"}</b> Notas da planilha · grade ${pulse ? pulse.fill : 0}% preenchida</li>
+            <li>
+              <div class="ring-line"><span>Questões</span><b>${qScore}%</b></div>
+              <div class="muted">${pulse && pulse.q ? pulse.q.hits : 0} acertos em ${pulse && pulse.q ? pulse.q.n : 0} resolvidas</div>
+              <div class="bar"><i style="width:${Math.max(0, Math.min(100, qScore))}%"></i></div>
+            </li>
+            <li>
+              <div class="ring-line"><span>Disciplinas</span><b>${pulse ? pulse.studied : 0}/${pulse ? pulse.planned : 0}</b></div>
+              <div class="muted">${pulse ? pulse.studied : 0} estudadas na meta · ${pulse ? pulse.missed : 0} não estudadas</div>
+              <div class="bar cyan"><i style="width:${Math.max(0, Math.min(100, dScore))}%"></i></div>
+            </li>
+            <li>
+              <div class="ring-line"><span>Horas</span><b>${hScore}%</b></div>
+              <div class="muted">${pulse ? pulse.hoursDone : 0}h batidas de ${pulse ? pulse.hoursPlan : 0}h previstas</div>
+              <div class="bar blue"><i style="width:${Math.max(0, Math.min(100, hScore))}%"></i></div>
+            </li>
+            <li>
+              <div class="ring-line"><span>Editais</span><b>${edital.pct}%</b></div>
+              <div class="muted">${edital.done} de ${edital.n} assuntos trabalhados</div>
+              <div class="bar violet"><i style="width:${edital.pct}%"></i></div>
+            </li>
           </ul>
         </div>
         <div class="stack">
