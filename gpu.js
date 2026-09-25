@@ -20,27 +20,31 @@
   var fs = [
     "precision mediump float;",
     "uniform sampler2D uTex;uniform float uTime;uniform vec2 uRes;",
+    "vec3 cell(float idx, vec2 tuv){",
+    "float col=mod(idx,4.0);",
+    "float row=floor(idx/4.0);",
+    "vec2 uv=vec2(col/4.0,(1.0-(row+1.0))/2.0)+clamp(tuv,0.02,0.98)*vec2(0.25,0.5);",
+    "return texture2D(uTex,uv).rgb;",
+    "}",
     "void main(){",
     "vec3 navy=vec3(0.020,0.031,0.078);",
     "vec2 uv=gl_FragCoord.xy/uRes;",
-    "float aspect=uRes.x/max(uRes.y,1.0);",
-    "vec2 p=uv-vec2(0.58,0.64);",
-    "p.x*=aspect;",
-    "float ang=0.11*sin(uTime*0.42);",
-    "float cs=cos(ang);float sn=sin(ang);",
-    "vec2 r=vec2(cs*p.x-sn*p.y,sn*p.x+cs*p.y);",
-    "r.y+=0.025*sin(uTime*0.31);",
-    "float breathe=1.0+0.045*sin(uTime*0.52);",
-    "r/=breathe;",
-    "vec2 tuv=vec2(r.x/aspect,r.y)*1.12+0.5;",
-    "vec2 px=vec2(0.6/1024.0,0.6/720.0);",
-    "vec3 c=texture2D(uTex,tuv).rgb;",
-    "c=c*0.82+texture2D(uTex,tuv+px).rgb*0.06+texture2D(uTex,tuv-px).rgb*0.06+texture2D(uTex,tuv+vec2(px.x,-px.y)).rgb*0.03+texture2D(uTex,tuv+vec2(-px.x,px.y)).rgb*0.03;",
-    "float filament=pow(clamp(c.b,0.0,1.0),1.6);",
-    "c+=vec3(0.015,0.05,0.10)*filament*(0.5+0.5*sin(uTime*1.15+length(p)*7.0));",
-    "float edge=smoothstep(0.42,1.15,length(p));",
-    "c=mix(c,navy,edge*0.35);",
-    "if(tuv.x<0.0||tuv.y<0.0||tuv.x>1.0||tuv.y>1.0) c=navy;",
+    "vec2 p=uv-vec2(0.50,0.60);",
+    "p.x*=uRes.x/max(uRes.y,1.0);",
+    "float rad=0.36;",
+    "vec2 tuv=p/(rad*2.0)+0.5;",
+    "float cycle=mod(uTime,32.0)/32.0*8.0;",
+    "float i0=floor(cycle);",
+    "float f=fract(cycle);",
+    "f=f*f*(3.0-2.0*f);",
+    "float ang=cycle*0.785398;",
+    "vec2 q=tuv*6.28318;",
+    "vec2 flow=vec2(sin(q.y*2.0+ang)+0.5*sin(q.x*3.0-ang),cos(q.x*2.2+ang)+0.5*cos(q.y*2.6+ang))*0.02;",
+    "vec3 c=mix(cell(i0,tuv+flow),cell(mod(i0+1.0,8.0),tuv+flow),f);",
+    "float lum=max(c.r,max(c.g,c.b));",
+    "float keep=smoothstep(0.015,0.07,lum);",
+    "keep*=1.0-smoothstep(rad*0.9,rad*1.05,length(p));",
+    "c=mix(navy,c,clamp(keep,0.0,1.0));",
     "gl_FragColor=vec4(c,1.0);",
     "}",
   ].join("");
@@ -85,7 +89,7 @@
     lastDraw = 0;
     if (reduced) requestAnimationFrame(draw);
   };
-  img.src = "./fundo-orbe.jpg";
+  img.src = "./orbe-atlas.jpg";
   var dpr = Math.min(window.devicePixelRatio || 1, 1.25);
   var slow = 0;
   var lastDraw = 0;
