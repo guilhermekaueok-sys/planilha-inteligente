@@ -989,9 +989,11 @@ const pages = {
       <p class="kicker">Edital 02/2026</p>
       <h1>O que está no programa e o que já caiu fora.</h1>
       <p class="sub">Amostra: 9 editais recentes de Guarda (Mauá, Tamandaré, Piumhi, Santa Maria de Jetibá, Nísia Floresta, Caldas Novas, Curitiba, Benevides, Santana do Mundaú) + padrão de prefeituras.</p>
+      <div class="room-view room-edital">
       ${TOPICS.sort((a,b)=>b.rec-a.rec).map((t) => {
         const d = DISC.find((x)=>x.id===t.d);
         const st = S.topic[t.id] || "pendente";
+        const pct = Math.round((Number(t.rec) || 0) * 100);
         return `<div class="topic">
           <div class="row">
             <span class="chip ${t.rec>=0.9?"alta":t.rec>=0.8?"media":"baixa"}">${t.caiu?"CAIÚ EM PROVA":"SÓ EDITAL"}</span>
@@ -1002,8 +1004,10 @@ const pages = {
           </div>
           <p style="margin:8px 0 4px">${t.t}</p>
           <p class="muted">${t.reps}</p>
+          <div class="bar" title="recorrência"><i style="width:${pct}%"></i></div>
         </div>`;
       }).join("")}
+      </div>
     `;
   },
   questoes() {
@@ -1141,7 +1145,8 @@ const pages = {
       <p class="kicker">Turma · ${list.length} parceiros · sala ${liveStatus}</p>
       <h1>Quem estuda junto sobe junto.</h1>
       <p class="sub">Abra a mesma sala nos dois aparelhos. Questões, nível e chat passam direto para o app do outro enquanto os dois estiverem com a página aberta.</p>
-      <div class="card" style="margin-bottom:12px">
+      <div class="room-view room-turma">
+      <div class="card">
         <div class="muted">MESTRE DESTE CHAT</div>
         <p class="muted">O Grok atualiza o arquivo no seu Drive. Aqui o app puxa sem novo zip. Deixe o arquivo “qualquer um com o link”.</p>
         <input id="masterUrl" value="${(S.masterUrl || "").replace(/"/g, "")}" style="width:100%;margin:8px 0">
@@ -1178,19 +1183,22 @@ const pages = {
         <button class="btn" id="addFriend" style="margin-top:8px">Colar e acompanhar</button>
         <p id="turmaMsg" class="muted"></p>
       </div>
-      <h3>Placar da turma</h3>
+      <h3 class="room-span">Placar da turma</h3>
       ${board.map((p, i) => {
         const pct = p.avg == null ? "—" : Math.round(p.avg * 100) + "%";
+        const bar = p.avg == null ? 0 : Math.round(p.avg * 100);
         const mine = p.id === me.id;
-        return `<div class="card" style="margin-bottom:8px">
+        return `<div class="card">
           <div class="row" style="justify-content:space-between">
             <strong>${i + 1}. ${p.name} ${mine ? "(você)" : ""}</strong>
             <span class="${p.avg >= 0.85 ? "forte" : p.avg != null && p.avg < 0.7 ? "fraco" : ""}">${pct}</span>
           </div>
           <div class="muted">@${p.handle} · ${p.n || 0} questões · sem. ${p.week || "—"}</div>
+          <div class="bar"><i style="width:${bar}%"></i></div>
           ${!mine ? `<div class="row" style="margin-top:8px"><button class="btn ghost" data-openchat="${p.id}">Abrir chat</button></div>` : ""}
         </div>`;
       }).join("")}
+      </div>
     `;
   },
   chat() {
@@ -1231,12 +1239,13 @@ const pages = {
       <p class="kicker">Anki · ${n} cards do edital</p>
       <h1>Planilha Inteligente e Anki no mesmo ciclo.</h1>
       <p class="sub">Dois caminhos. O arquivo funciona em qualquer Anki. O botão vivo só funciona com o Anki aberto + add-on AnkiConnect (código 2055492159).</p>
+      <div class="room-view room-anki">
       <div class="card">
         <div class="muted">1 · IMPORTAR ARQUIVO (sempre funciona)</div>
         <p>Arquivo → Importar no Anki. Tipo: notas básicas. Campos: Frente, Verso, Tags. Baralho sugerido: <strong>${DECK}</strong>.</p>
         <button class="btn" id="ankiDl">Baixar baralho .txt</button>
       </div>
-      <div class="card" style="margin-top:12px">
+      <div class="card">
         <div class="muted">2 · ANKICONNECT (Anki aberto neste PC)</div>
         <p class="muted">Em Anki: Ferramentas → Add-ons → AnkiConnect. Em Config, acrescente a origem desta página em <code>webCorsOriginList</code>.</p>
         <div class="row">
@@ -1245,9 +1254,10 @@ const pages = {
         </div>
         <p id="ankiMsg" class="muted" style="margin-top:10px">Ainda não testou.</p>
       </div>
-      <h3>O que vai no baralho</h3>
-      <p class="muted">Quadro oficial da prova + cada tópico do Anexo V com a nota de recorrência.</p>
+      <h3 class="room-span">O que vai no baralho</h3>
+      <p class="muted room-span">Quadro oficial da prova + cada tópico do Anexo V com a nota de recorrência.</p>
       ${cards().slice(0, 8).map(([f]) => `<div class="topic"><p style="margin:0">${f}</p></div>`).join("")}
+      </div>
       <p class="muted">… e mais ${n - 8} cards.</p>
     `;
   },

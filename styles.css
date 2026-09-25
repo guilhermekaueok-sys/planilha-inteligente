@@ -387,8 +387,16 @@ input:focus, select:focus, textarea:focus {
 .zoom-box [data-view].on {
   background: linear-gradient(180deg, #5af0ff, #1bb8d9); color: #031018;
 }
-.side .zoom-box { margin-left: 0; flex-wrap: wrap; }
-.side.collapsed .zoom-box [data-view] { display: none; }
+.side .zoom-box {
+  margin-left: 0; flex-wrap: wrap;
+  max-height: 0; opacity: 0; overflow: hidden; pointer-events: none;
+  transition: max-height .2s ease, opacity .2s ease;
+}
+.side:hover .zoom-box,
+.side:focus-within .zoom-box {
+  max-height: 96px; opacity: 1; pointer-events: auto;
+}
+.side.collapsed:not(:hover):not(:focus-within) .zoom-box [data-view] { display: none; }
 .disc-board { display: grid; gap: 8px; }
 .disc-item { margin: 0; }
 .disc-item .bar,
@@ -402,6 +410,19 @@ body.view-blocos .disc-item .muted { overflow-wrap: anywhere; }
 body.view-blocos .card .disc-line {
   display: flex; flex-direction: column; align-items: stretch; gap: 6px;
   margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 12px;
+}
+.room-view { display: grid; gap: 8px; }
+.room-span { grid-column: 1 / -1; }
+body.view-blocos .room-view {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-items: start;
+}
+body.view-blocos .room-view > .card { margin: 0 !important; }
+body.view-blocos .room-edital .topic,
+body.view-blocos .room-anki .topic {
+  margin: 0; padding: 10px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: rgba(12, 20, 36, .8);
 }
 .presence { padding: 12px 14px 8px; border-bottom: 1px solid var(--line); flex: none; }
 .presence strong { display: block; font-size: 12px; letter-spacing: .04em; color: #7af6ff; }
@@ -449,6 +470,7 @@ body.view-blocos .card .disc-line {
   .side:not(.open) .side-arrow { position: fixed; left: 6px; top: 74px; }
   .side.open { width: min(80vw, 280px); padding: 16px 10px; background: rgba(8,12,24,.96); border-right: 1px solid var(--line); }
   .side.collapsed { width: min(80vw, 280px); }
+  .side.open .zoom-box { max-height: 96px; opacity: 1; pointer-events: auto; }
   .side.collapsed .nav-label,
   .side.collapsed #zoomLbl { display: revert; }
   .g4, .g2 { grid-template-columns: 1fr; }
