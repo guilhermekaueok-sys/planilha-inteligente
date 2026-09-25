@@ -68,7 +68,10 @@
     /reda[cç][aã]o oficial/i, /^observa[cç][oõ]es?\b/i, /^aten[cç][aã]o\b/i, /^importante\b/i,
     /hor[aá]rio de aplica[cç][aã]o/i, /local de prova/i, /documentos? de identifica[cç][aã]o/i,
     /^sum[aá]rio\b/i, /^[ií]ndice\b/i, /continua[cç][aã]o/i, /^www\./i, /^https?:/i,
-    /inscri[cç][aã]o/i, /deferiment/i, /comprovante/i, /^\d+\s*$/, /^[-–—•·*.\s]+$/
+    /inscri[cç][aã]o/i, /deferiment/i, /comprovante/i, /concurso p[uú]blico/i,
+    /requisito/i, /\bvagas\b/i, /investidura/i, /defici[eê]ncia/i, /candidato/i,
+    /correio eletr/i, /telefone/i,
+    /^\d+\s*$/, /^[-–—•·*.\s]+$/
   ];
 
   function normalizarEspacos(s) {
@@ -106,7 +109,8 @@
     var pats = [
       /cargo(?:\s*\/\s*especialidade)?\s*[:\-–—]\s*([^\n]{3,120})/i,
       /para o cargo de\s+([^\n.]{3,120})/i,
-      /emprego(?:\s+p[uú]blico)?\s*[:\-–—]\s*([^\n]{3,120})/i
+      /emprego(?:\s+p[uú]blico)?\s*[:\-–—]\s*([^\n]{3,120})/i,
+      /concurso p[uú]blico para\s+([A-Za-zÀ-ú][^\n]{3,80})/i
     ];
     for (var i = 0; i < pats.length; i++) {
       var m = texto.match(pats[i]);
@@ -115,28 +119,40 @@
     return "";
   }
   function detectarProva(texto) {
-    var m = texto.match(/(?:data(?:\s+prevista)?\s+(?:da|de)\s+(?:aplica[cç][aã]o|realiza[cç][aã]o)(?:\s+da(?:s)?\s+prova(?:s)?)?|prova objetiva|realiza[cç][aã]o da prova)[^\d]{0,30}(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
-    return m ? m[1] : "";
+    var m = texto.match(/(?:data(?:\s+prevista)?\s+(?:da|de)\s+(?:aplica[cç][aã]o|realiza[cç][aã]o)(?:\s+da(?:s)?\s+prova(?:s)?)?|prova objetiva|realiza[cç][aã]o da prova)[\s\S]{0,80}?(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+    if (m) return m[1];
+    var porExtenso = texto.match(/(?:prova|aplica[cç][aã]o)[\s\S]{0,60}?(\d{1,2})\s+de\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(\d{4})/i);
+    if (!porExtenso) return "";
+    var meses = { janeiro: "01", fevereiro: "02", marco: "03", março: "03", abril: "04", maio: "05", junho: "06", julho: "07", agosto: "08", setembro: "09", outubro: "10", novembro: "11", dezembro: "12" };
+    var mes = meses[porExtenso[2].toLowerCase()] || "";
+    return mes ? ("0" + porExtenso[1]).slice(-2) + "/" + mes + "/" + porExtenso[3] : "";
   }
   function detectarInscricao(texto) {
-    var m = texto.match(/(?:per[ií]odo|prazo)\s+de\s+inscri[cç][aã]o(?:es)?\s*[:\-–—]?\s*([^\n]{5,140})/i)
-      || texto.match(/inscri[cç][oõ]es?\s+(?:ser[aã]o\s+)?(?:realizadas?|abertas?)\s+(?:no\s+per[ií]odo\s+)?(?:de\s+)?([^\n.]{8,140})/i);
-    var raw = m ? m[1] : "";
-    var datas = (raw || texto).match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*(?:a|at[eé]|–|-)\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    if (datas && (raw || /inscri/i.test(texto.slice(Math.max(0, datas.index - 60), datas.index)))) return datas[1] + " a " + datas[2];
-    return raw.replace(/\s+/g, " ").trim().slice(0, 120);
+    var re = /(?:per[ií]odo|prazo)\s+de\s+inscri[cç][aã]o[^\n]{0,180}/gi;
+    var m;
+    while ((m = re.exec(texto))) {
+      var datas = m[0].match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*(?:a|at[eé]|–|-)\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+      if (datas) return datas[1] + " a " + datas[2];
+    }
+    return "";
   }
   function detectarTaxa(texto) {
-    var m = texto.match(/taxa\s+de\s+inscri[cç][aã]o\s*[:\-–—]?\s*(R\$\s*[\d.]+,\d{2})/i)
-      || texto.match(/(?:valor|import[aâ]ncia)\s+(?:da\s+)?taxa\s*[:\-–—]?\s*(R\$\s*[\d.]+,\d{2})/i);
+    var m = texto.match(/taxa\s+de\s+inscri[cç][aã]o[\s\S]{0,180}?(R\$\s*[\d.]+,\d{2})/i)
+      || texto.match(/(?:valor|import[aâ]ncia)\s+(?:da\s+)?taxa[\s\S]{0,80}?(R\$\s*[\d.]+,\d{2})/i);
     return m ? m[1].replace(/\s+/g, " ") : "";
   }
   function extrairBlocoConteudo(texto) {
+    var forte = [
+      /conte[uú]do(?:s)? program[aá]tico(?:s)?/i,
+      /programa de provas/i,
+      /programa(?:s)? (?:das|de) (?:disciplinas|provas|mat[eé]rias)/i
+    ];
     var inicio = -1;
-    GATILHOS_CONTEUDO.forEach(function (re) {
-      var m = re.exec(texto);
-      if (m && (inicio < 0 || m.index < inicio)) inicio = m.index;
-    });
+    var lista = forte.concat(GATILHOS_CONTEUDO);
+    for (var n = 0; n < lista.length && inicio < 0; n++) {
+      var m = lista[n].exec(texto);
+      if (m) inicio = m.index;
+    }
     if (inicio < 0) return "";
     var linhas = texto.slice(inicio).split(/\n/);
     var out = [];
@@ -191,7 +207,7 @@
       }
       if (!atual || !pareceAssunto(t)) return;
       var assunto = limparLinha(t).replace(/^(?:\d+(?:\.\d+)*)[.)\-\s]+/, "").replace(/^[a-z]\)\s+/i, "").replace(/^[ivxlcdm]+\)\s+/i, "");
-      if (assunto.length >= 3) atual.assuntos.push(assunto);
+      if (assunto.length >= 3 && !/@|telefone|candidato dever[aá]|correio eletr/i.test(assunto)) atual.assuntos.push(assunto);
     });
     flush();
     return disciplinas;
