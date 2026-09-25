@@ -648,3 +648,43 @@ body.view-blocos .room-anki .topic {
   .main { padding: 16px 16px 96px; }
   .hud-file, .hud-field { display: none; }
 }
+.ia-overlay {
+  position: fixed; inset: 0; z-index: 70;
+  display: grid; place-items: center;
+  background: rgba(5, 8, 20, .55);
+  opacity: 0;
+  transition: opacity .36s ease;
+}
+.ia-overlay[hidden] { display: none; }
+.ia-overlay.show { opacity: 1; }
+.ia-modal {
+  width: min(440px, calc(100% - 32px));
+  background: #10192b;
+  border: 1px solid rgba(60, 230, 255, .35);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .35);
+  transform: translateY(16px);
+  opacity: 0;
+  transition: transform .36s ease, opacity .36s ease;
+}
+.ia-overlay.show .ia-modal { transform: translateY(0); opacity: 1; }
+.ia-x {
+  position: absolute; top: 10px; right: 10px;
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 0; background: transparent; color: #d7e7f6;
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.ia-modal { position: relative; }
+.ia-wait { display: grid; gap: 8px; justify-items: start; color: #d7e7f6; font-size: 13px; }
+.ia-spin {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(60, 230, 255, .25);
+  border-top-color: #7af6ff;
+  animation: ia-spin .7s linear infinite;
+}
+.ia-skel { height: 10px; width: 100%; border-radius: 6px; background: rgba(60, 230, 255, .12); }
+.ia-skel.short { width: 62%; }
+.ia-precision { margin: 0 0 8px; color: #7af6ff; font-weight: 700; }
+.ia-say { margin: 0; line-height: 1.45; }
+@keyframes ia-spin { to { transform: rotate(360deg); } }

@@ -7,7 +7,7 @@
   <title>A Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-a.jpg" />
-  <link rel="stylesheet" href="./styles.css?v=39" />
+  <link rel="stylesheet" href="./styles.css?v=40" />
 </head>
 <body>
   <canvas id="nebula" aria-hidden="true"></canvas>
@@ -96,6 +96,13 @@
       </div>
     </aside>
   </div>
+  <div class="ia-overlay" id="iaOverlay" hidden>
+    <div class="ia-modal" role="dialog" aria-modal="true" aria-labelledby="iaModalTitle">
+      <button type="button" class="ia-x" id="iaClose" aria-label="Fechar">×</button>
+      <p class="kicker" id="iaModalTitle">Pergunte às IAs</p>
+      <div id="iaModalBody"></div>
+    </div>
+  </div>
   <script>
     (function () {
       var ua = navigator.userAgent || "";
@@ -134,8 +141,8 @@
   <script defer src="./projetos/modelo.js"></script>
   <script defer src="./gpu.js?v=12"></script>
   <script defer src="./radar.js?v=2"></script>
-  <script defer src="./atlas.js?v=5"></script>
-  <script defer src="./app.js?v=26"></script>
+  <script defer src="./atlas.js?v=6"></script>
+  <script defer src="./app.js?v=27"></script>
   <script defer src="./session.js?v=19"></script>
 </body>
 </html>

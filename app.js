@@ -537,6 +537,33 @@ if (!S.day) S.day = todayDayId();
 if (!S.planMode) S.planMode = "auto";
 if (!S.board || !S.board.length) S.board = emptyBoard();
 let page = "comando";
+let iaTicket = 0;
+function iaText(s) {
+  var amp = String.fromCharCode(38);
+  return String(s || "").replace(new RegExp(amp, "g"), amp + "amp;").replace(/</g, amp + "lt;").replace(/>/g, amp + "gt;").replace(/"/g, amp + "quot;");
+}
+function openIaModal() {
+  const overlay = $("iaOverlay");
+  const body = $("iaModalBody");
+  if (!overlay || !body) return;
+  body.innerHTML = `<div class="ia-wait"><i class="ia-spin"></i><span>As IAs estão cruzando a resposta.</span><div class="ia-skel"></div><div class="ia-skel short"></div></div>`;
+  overlay.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add("show")));
+}
+function fillIaModal(pack) {
+  const body = $("iaModalBody");
+  if (!body) return;
+  const votes = pack.votes && pack.votes.length ? "Consenso de " + pack.votes.join(", ") + "." : "Sem resposta das IAs nesta rodada.";
+  const precision = Math.max(0, Math.min(100, Math.round(Number(pack.precision) || 0)));
+  body.innerHTML = `<p class="ia-precision">Precisão ${precision}%.</p><p class="ia-say">${iaText(pack.say || "")}</p><p class="muted">${iaText(votes)}</p>`;
+}
+function closeIaModal() {
+  const overlay = $("iaOverlay");
+  if (!overlay) return;
+  iaTicket += 1;
+  overlay.classList.remove("show");
+  setTimeout(() => { if (!overlay.classList.contains("show")) overlay.hidden = true; }, 380);
+}
 const TOUR = [
   { page: "comando", text: "Aqui é o Comando. A fila sobe o que pesa na prova e ainda está fraco no seu acerto." },
   { page: "radar", text: "No Radar você vê importância × nível. Barra menta = peso. Texto = seu desempenho." },
@@ -1398,7 +1425,6 @@ const pages = {
   sobre() {
     const a = window.ATLAS ? ATLAS.prefs() : {};
     const on = a.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
-    const last = S.iaLast || null;
     const models = [["chatgpt", "ChatGPT"], ["claude", "Claude"], ["gemini", "Gemini"], ["copilot", "Copilot"]];
     return `
       <p class="kicker">PERGUNTE ÀS IAs</p>
@@ -1415,7 +1441,7 @@ const pages = {
           <input id="iaAsk" placeholder="Peça às IAs" style="flex:1">
           <button class="btn" id="iaSend" type="button">Consultar</button>
         </div>
-        ${last ? `<p style="margin-top:12px"><strong>Precisão ${last.precision}%.</strong> ${last.votes && last.votes.length ? "Consenso de " + last.votes.join(", ") + "." : "Sem resposta das IAs."}</p><p>${last.say || ""}</p>` : `<p class="muted" style="margin-top:12px">A precisão sobe quando as IAs concordam entre si.</p>`}
+        <p class="muted" style="margin-top:12px">A resposta abre à frente, com a precisão do consenso.</p>
       </div>
     `;
   },
@@ -1536,7 +1562,11 @@ function rowDisc(d) {
   </div>`;
 }
 
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeIaModal();
+});
 document.addEventListener("click", (e) => {
+  if (e.target.id === "iaClose" || e.target.id === "iaOverlay") { closeIaModal(); return; }
   if (!e.target.closest(".side-tools")) {
     const pop = $("zoomPop");
     if (pop) pop.hidden = true;
@@ -1829,10 +1859,20 @@ document.addEventListener("click", (e) => {
     const text = inp && inp.value.trim();
     if (!text) return;
     inp.value = "";
-    ATLAS.act(text).then((pack) => {
+    openIaModal();
+    const ticket = ++iaTicket;
+    const run = ATLAS.consult ? ATLAS.consult(text) : ATLAS.act(text);
+    Promise.race([
+      run,
+      new Promise((resolve) => setTimeout(() => resolve({ say: "O pedido passou do tempo. Tente de novo.", precision: 0, votes: [] }), 28000)),
+    ]).then((pack) => {
+      if (ticket !== iaTicket) return;
       S.iaLast = pack || { say: "Não fechei esse pedido.", precision: 0, votes: [] };
       save(S);
-      render({ force: true });
+      fillIaModal(S.iaLast);
+    }).catch(() => {
+      if (ticket !== iaTicket) return;
+      fillIaModal({ say: "As IAs não responderam. Confira a chave neste aparelho.", precision: 0, votes: [] });
     });
     return;
   }

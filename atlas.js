@@ -446,9 +446,11 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ which: which, key: key, prompt: prompt }),
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (!j || j.error) throw new Error("modelo");
-      return j.text || "";
+    }).then(function (r) {
+      return r.json().catch(function () { return { error: "resposta" }; });
+    }).then(function (j) {
+      if (!j || j.error || !j.text) throw new Error("modelo");
+      return j.text;
     });
   }
   function wordSet(s) {
@@ -497,6 +499,20 @@
       scores.forEach(function (s, i) { if (s > scores[best]) best = i; });
       var precision = Math.round(scores.reduce(function (a, b) { return a + b; }, 0) / scores.length * 100);
       return { say: ok[best].text, precision: precision, votes: ok.map(function (r) { return r.name; }) };
+    });
+  }
+  function consult(raw) {
+    var local = null;
+    try { local = exec(raw); } catch (e) { local = null; }
+    return askAll(raw).then(function (pack) {
+      pack = pack || { say: "", precision: 0, votes: [] };
+      var precision = Math.max(0, Math.min(100, Math.round(Number(pack.precision) || 0)));
+      if (!pack.votes || !pack.votes.length) {
+        return { say: local || pack.say || "As IAs não responderam. Confira a chave neste aparelho.", precision: local ? 100 : 0, votes: [] };
+      }
+      return { say: local ? local + " " + (pack.say || "") : pack.say, precision: precision, votes: pack.votes };
+    }).catch(function () {
+      return { say: local || "As IAs não responderam. Confira a chave neste aparelho.", precision: local ? 100 : 0, votes: [] };
     });
   }
   function safeOps(list) {
@@ -592,6 +608,7 @@
     listen: listen,
     prime: prime,
     askAll: askAll,
+    consult: consult,
     act: act,
     setWebhook: function (url) { prefs().webhook = String(url || ""); },
     oauthStart: oauthStart,
