@@ -3,8 +3,8 @@
   --bg2: #0a1020;
   --surface: #0c1424;
   --surface2: #121c30;
-  --fg: #e8f6ff;
-  --muted: #7f93b3;
+  --fg: #f7fbff;
+  --muted: #c5d6ee;
   --mint: #3ce6ff;
   --mint-deep: #1bb8d9;
   --mint-ink: #031018;
@@ -112,7 +112,7 @@ a { color: var(--mint); }
 }
 .side {
   width: 228px;
-  background: rgba(8,12,24,.88);
+  background: rgba(8,12,24,.96);
   border-right: 1px solid var(--line);
   padding: 16px 10px;
   position: sticky; top: 0; height: 100dvh;
@@ -167,7 +167,7 @@ a { color: var(--mint); }
 .main { flex: 1; padding: 22px 20px 80px; min-width: 0; }
 .dock {
   width: 320px;
-  background: rgba(8,14,28,.92);
+  background: rgba(8,14,28,.97);
   border: 1px solid var(--line);
   border-radius: 18px;
   display: flex; flex-direction: column;
@@ -205,7 +205,7 @@ a { color: var(--mint); }
 .topbar {
   display: flex; align-items: center; gap: 10px; padding: 10px 16px;
   border-bottom: 1px solid var(--line);
-  background: rgba(5,8,20,.8);
+  background: rgba(5,8,20,.94);
   backdrop-filter: blur(12px);
   position: sticky; top: 0; z-index: 12;
 }
@@ -219,9 +219,9 @@ a { color: var(--mint); }
   min-height: 28px; border: 0; background: transparent; width: 140px;
   padding: 0;
 }
-.kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--mint); }
-h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.03em; }
-.sub { color: var(--muted); margin: 0 0 18px; max-width: 42rem; line-height: 1.5; }
+h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.03em; font-weight: 650; color: #f7fbff; text-shadow: 0 1px 2px #050814, 0 0 14px rgba(5,8,20,.92); }
+.sub { color: #e7f0fb; margin: 0 0 18px; max-width: 42rem; line-height: 1.5; text-shadow: 0 1px 2px #050814, 0 0 12px rgba(5,8,20,.9); }
+.kicker { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #bff6ff; text-shadow: 0 1px 2px #050814; }
 .grid { display: grid; gap: 12px; }
 .g2 { grid-template-columns: repeat(2, 1fr); }
 .g4 { grid-template-columns: repeat(4, 1fr); }
@@ -256,11 +256,12 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.0
 .voice-btn span { color: var(--muted); font-size: 12px; }
 .main { padding-right: 360px; }
 .card {
-  background: rgba(12,20,36,.82);
+  background: rgba(8,14,26,.96);
   border: 1px solid var(--line);
   border-radius: 16px; padding: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35);
   backdrop-filter: blur(10px);
+  color: #f7fbff;
 }
 .kpi { font-variant-numeric: tabular-nums; font-size: 1.6rem; margin-top: 8px; color: var(--mint); }
 .muted { color: var(--muted); font-size: 12px; }
