@@ -71,6 +71,18 @@ a { color: var(--mint); }
 }
 .brand-logo.lg, .j-mark.lg { width: 52px; height: 52px; border-radius: 14px; }
 .brand { display: flex; gap: 10px; align-items: flex-start; padding: 8px 8px 18px; position: relative; }
+.user-chip {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 52px; padding: 0 28px 0 0;
+  border: 0; background: transparent; color: var(--fg); text-align: left;
+}
+.user-chip-name {
+  font-size: 11px; font-weight: 600; line-height: 1.2;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.side.collapsed .user-chip { width: 52px; padding: 0; justify-content: center; }
+.side.collapsed .user-chip-name { display: none; }
+.plan-title { letter-spacing: .16em; font-size: 1.25rem; font-weight: 700; }
 .brand-copy { margin-left: auto; text-align: right; padding-right: 12px; min-width: 0; }
 .brand-name { letter-spacing: .18em; font-size: 13px; }
 .brand-abrev {
@@ -353,15 +365,30 @@ input:focus, select:focus, textarea:focus {
 .plan-chip .btn { min-height: 28px; min-width: 28px; padding: 0; }
 .day-col select { width: 100%; margin-top: 10px; }
 .ciclo-wrap { display: grid; gap: 14px; overflow-x: auto; }
-.ciclo-grid { width: 100%; min-width: 980px; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+.ciclo-grid { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
 .ciclo-grid th, .ciclo-grid td { border: 1px solid #1a2338; padding: 6px; vertical-align: top; }
-.ciclo-grid .meta-h, .ciclo-grid thead th { background: #05080f; color: #fff; letter-spacing: .06em; font-size: 11px; }
-.ciclo-grid tbody th { background: #0b1220; color: var(--fg); width: 52px; }
+.ciclo-grid .meta-h, .ciclo-grid thead th { background: #05080f; color: #fff; letter-spacing: .04em; font-size: 10px; }
+.ciclo-grid .meta-h, .ciclo-grid tbody th { width: 36px; max-width: 36px; padding: 4px 2px; font-size: 9px; }
+.ciclo-grid tbody th { background: #0b1220; color: var(--fg); }
 .ciclo-grid td { background: #9bb7d8; color: #071018; }
+.ciclo-grid td.feito-ok { background: #1f8a4c; color: #f4fff8; }
+.ciclo-grid td.feito-no { background: #a33b4a; color: #fff6f7; }
 .ciclo-grid td.sim { background: #f4f7fb; text-align: center; }
+.ciclo-grid td.sim.feito-ok { background: #1f8a4c; }
+.ciclo-grid td.sim.feito-no { background: #a33b4a; }
 .ciclo-grid td select, .ciclo-grid td input {
   width: 100%; min-height: 28px; background: #eef4fb; color: #071018; border-color: #7f97b3;
 }
+.modo-row, .feito-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.modo-btn, .feito-btn {
+  flex: 1 1 30%; min-height: 26px; padding: 0 4px;
+  border-radius: 8px; border: 1px solid #7f97b3;
+  background: #eef4fb; color: #071018; font-size: 10px; font-weight: 650;
+}
+.modo-btn.on { background: #0b3a4a; color: #e8ffff; border-color: #1bb8d9; }
+.feito-btn.ok.on { background: #0d5c32; color: #f4fff8; border-color: #8dffc4; }
+.feito-btn.no.on { background: #7a2432; color: #fff6f7; border-color: #ffb0bc; }
+.freq-btn.on { background: linear-gradient(180deg, #5af0ff, #1bb8d9); color: #031018; }
 
 @keyframes gridDrift {
   to { background-position: 48px 48px; }

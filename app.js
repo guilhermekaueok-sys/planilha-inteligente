@@ -193,7 +193,13 @@ function save(s, silent) {
 function captureField(el) {
   if (!el || !S) return;
   if (el.id === "meName" || el.id === "gateName" || el.id === "topName") S.me.name = el.value;
-  if (el.id === "topEmail") S.me.email = el.value;
+  if (el.id === "topEmail" || el.id === "userMail") S.me.email = el.value;
+  if (el.id === "userName") S.me.name = el.value;
+  if (el.id === "userPhone") S.me.phone = el.value;
+  if (el.id === "userExam") S.me.exam = el.value;
+  if (el.id === "userAbout") S.me.about = el.value;
+  if (el.id === "userFoco") S.me.foco = el.value;
+  if (el.id === "userMetaQ") S.me.metaQ = Math.max(0, Number(el.value) || 0);
   if (el.id === "meHandle") S.me.handle = String(el.value || "").replace(/\s/g, "");
   if (el.id === "weekIn") S.week = Math.min(14, Math.max(1, Number(el.value) || 1));
   if (el.id === "dayIn") S.day = el.value;
@@ -351,6 +357,42 @@ function boardCell(meta, slot, ciclo) {
 function discOpts(sel) {
   return [{ id: "", sigla: "—" }, { id: "sim", sigla: "Simulado" }, ...DISC]
     .map((o) => `<option value="${o.id}" ${o.id === sel ? "selected" : ""}>${o.sigla}</option>`).join("");
+}
+const DAYHEAD = { i: "SEGUNDA", ii: "TERÇA", iii: "QUARTA", iv: "QUINTA", v: "SEXTA", vi: "SÁBADO", vii: "DOMINGO" };
+function modoBtns(cell, mi, si, cid) {
+  const cur = cell.modo || "";
+  return `<div class="modo-row">${[["teoria", "Teoria"], ["questao", "Questão"], ["ambos", "Teoria e questões"]].map(([id, lab]) =>
+    `<button type="button" class="modo-btn${cur === id ? " on" : ""}" data-modo="${id}" data-meta="${mi}" data-slot="${si}" data-ciclo="${cid}">${lab}</button>`
+  ).join("")}</div>`;
+}
+function feitoBtns(cell, mi, si, cid) {
+  const f = cell.feito || "";
+  return `<div class="feito-row">
+    <button type="button" class="feito-btn ok${f === "ok" ? " on" : ""}" data-feito="ok" data-meta="${mi}" data-slot="${si}" data-ciclo="${cid}">Estudou</button>
+    <button type="button" class="feito-btn no${f === "no" ? " on" : ""}" data-feito="no" data-meta="${mi}" data-slot="${si}" data-ciclo="${cid}">Não estudou</button>
+  </div>`;
+}
+function weekQuestionScore() {
+  let n = 0;
+  let hits = 0;
+  const prefix = String(S.week) + "-";
+  Object.keys(S.logs || {}).forEach((k) => {
+    if (k.indexOf(prefix) !== 0) return;
+    n += Number(S.logs[k].n) || 0;
+    hits += Number(S.logs[k].hits) || 0;
+  });
+  const goal = Math.max(0, Number(S.me && S.me.metaQ) || 0);
+  const acc = n ? hits / n : 0;
+  const pace = goal ? Math.min(1, n / goal) : 0;
+  const score = !n ? 0 : Math.round(((acc + (goal ? pace : acc)) / (goal ? 2 : 1)) * 100);
+  return { n, hits, goal, score };
+}
+function simuladoScore() {
+  const logs = Array.isArray(S.simLogs) ? S.simLogs : [];
+  let pts = 0;
+  let tot = 0;
+  logs.forEach((r) => { pts += Number(r.pontos) || 0; tot += Number(r.total) || 0; });
+  return { n: logs.length, pts, tot, score: tot ? Math.round((pts / tot) * 100) : 0 };
 }
 function todayDayId() {
   return ["dom", "seg", "ter", "qua", "qui", "sex", "sab"][new Date().getDay()];
@@ -852,11 +894,25 @@ function render(opts) {
     });
     const whoami = $("whoami");
     if (whoami) whoami.textContent = "Planilha Inteligente";
+    const photo = $("userPhoto");
+    const chipName = $("userChipName");
+    if (photo) photo.src = (S.me && S.me.photo) || "./logo-pi.svg";
+    if (chipName) chipName.textContent = (S.me && S.me.name) || "Seu nome";
     const tn = $("topName");
     const te = $("topEmail");
     if (tn && document.activeElement !== tn) tn.value = S.me.name || "";
     if (te && document.activeElement !== te) te.value = (S.me && S.me.email) || "";
     paintDock();
+    if (S && S.entered) {
+      if (!Array.isArray(S.visits)) S.visits = [];
+      const now = Date.now();
+      const lastIn = S.visits[S.visits.length - 1] || 0;
+      if (now - lastIn > 20 * 60 * 1000) {
+        S.visits.push(now);
+        if (S.visits.length > 400) S.visits = S.visits.slice(-400);
+        save(S, true);
+      }
+    }
     if (window.PI) PI.hook("afterRender", page, S);
     if (page === "planilha" && window.PI && PI.sheetBind) {
       PI.sheetBind({
@@ -1046,11 +1102,31 @@ const pages = {
   },
   ciclo() {
     ensurePlan();
-    const opts = "";
+    const meta = S.board[0];
+    const mi = 0;
+    const head = (c) => DAYHEAD[c.id] || c.label;
+    const cellTd = (c, slot, si) => {
+      const cell = slot[c.id] || blankCell();
+      const mark = cell.feito === "ok" ? " feito-ok" : cell.feito === "no" ? " feito-no" : "";
+      if (c.simulado && si === 0) {
+        return `<td class="sim${mark}" rowspan="3">
+          <input data-board="nota" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${(slot[c.id] && slot[c.id].nota) || "Simulado"}">
+          <select data-board="disc" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}">${discOpts(cell.disc || "sim")}</select>
+          ${modoBtns(cell, mi, 0, c.id)}
+          ${feitoBtns(cell, mi, 0, c.id)}
+        </td>`;
+      }
+      if (c.simulado) return "";
+      return `<td class="${mark.trim()}">
+        <select data-board="disc" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}">${discOpts(cell.disc)}</select>
+        ${modoBtns(cell, mi, si, c.id)}
+        ${feitoBtns(cell, mi, si, c.id)}
+      </td>`;
+    };
     return `
       <p class="kicker">Plano de Estudos · semana ${S.week}</p>
-      <h1>Grade META × CICLO.</h1>
-      <p class="sub">CICLO I–VI = Seg a Sáb (3 blocos de 1H). CICLO VII = Simulado. Tudo se preenche na mão: matéria, hora, questões e nota.</p>
+      <h1 class="plan-title">PLANEJAMENTO SEMANAL</h1>
+      <p class="sub">Acione manualmente ou peça ao Atlas.</p>
       <div class="row" style="margin-bottom:12px">
         <button class="btn ghost" id="wprev">Semana −</button>
         <button class="btn ghost" id="wnext">Semana +</button>
@@ -1059,47 +1135,22 @@ const pages = {
         <button class="btn ghost" id="planRotate">Reorganizar agora</button>
       </div>
       <div class="ciclo-wrap">
-        ${S.board.map((meta, mi) => `
-          <table class="ciclo-grid">
-            <thead>
+        <table class="ciclo-grid">
+          <thead>
+            <tr>
+              <th class="meta-h">META</th>
+              ${CICLOS.map((c) => `<th>${head(c)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${meta.slots.map((slot, si) => `
               <tr>
-                <th class="meta-h">${meta.label}</th>
-                ${CICLOS.map((c) => `<th>${c.label}</th>`).join("")}
+                <th>1H</th>
+                ${CICLOS.map((c) => cellTd(c, slot, si)).join("")}
               </tr>
-            </thead>
-            <tbody>
-              ${meta.slots.map((slot, si) => `
-                <tr>
-                  <th>1H</th>
-                  ${CICLOS.map((c) => {
-                    const cell = slot[c.id] || blankCell();
-                    if (c.simulado && si === 0) {
-                      return `<td class="sim" rowspan="3">
-                        <input data-board="nota" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${(slot[c.id] && slot[c.id].nota) || "Simulado"}">
-                        <select data-board="disc" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}">${discOpts(cell.disc || "sim")}</select>
-                        <div class="sheet-mini">
-                          <input data-board="horas" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${cell.horas || "2"}" placeholder="h">
-                          <input data-board="ques" data-meta="${mi}" data-slot="0" data-ciclo="${c.id}" value="${cell.ques || ""}" placeholder="q">
-                        </div>
-                      </td>`;
-                    }
-                    if (c.simulado) return "";
-                    return `<td>
-                      <select data-board="disc" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}">
-                        ${discOpts(cell.disc)}
-                      </select>
-                      <div class="sheet-mini">
-                        <input data-board="horas" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}" value="${cell.horas || "1"}" placeholder="h">
-                        <input data-board="ques" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}" value="${cell.ques || ""}" placeholder="q">
-                      </div>
-                      <input data-board="nota" data-meta="${mi}" data-slot="${si}" data-ciclo="${c.id}" value="${cell.nota || ""}" placeholder="obs">
-                    </td>`;
-                  }).join("")}
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        `).join("")}
+            `).join("")}
+          </tbody>
+        </table>
       </div>
     `;
   },
@@ -1312,6 +1363,76 @@ const pages = {
       <div style="margin-top:12px">${rows || `<p class="muted">Nenhum simulado registrado.</p>`}</div>
     `;
   },
+  usuario() {
+    const me = S.me || {};
+    const win = [7, 15, 30].indexOf(Number(me.freqWin)) >= 0 ? Number(me.freqWin) : 30;
+    const list = Array.isArray(S.visits) ? S.visits : [];
+    const now = Date.now();
+    const inWin = list.filter((t) => now - t <= win * 86400000);
+    const prev = list.filter((t) => now - t > 60000);
+    const last = prev.length ? prev[prev.length - 1] : 0;
+    const lastTxt = last ? new Date(last).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "sem dados";
+    const q = weekQuestionScore();
+    const sim = simuladoScore();
+    const parts = [];
+    if (q.n) parts.push(q.score);
+    if (sim.tot) parts.push(sim.score);
+    const geral = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : 0;
+    const foto = me.photo || "./logo-pi.svg";
+    const metodo = me.metodo || "";
+    const qv = (v) => String(v || "").replace(/&/g, "&" + "amp;").replace(/"/g, "&" + "quot;").replace(/</g, "&" + "lt;");
+    return `
+      <p class="kicker">Usuário</p>
+      <h1>${qv(me.name) || "Seu nome"}</h1>
+      <p class="sub">Seus dados, o concurso e o desempenho. O status por evolução fica para depois.</p>
+      <div class="card" style="margin-bottom:12px">
+        <div class="row">
+          <img src="${foto}" alt="" class="brand-logo lg">
+          <label class="btn ghost" style="display:inline-flex;align-items:center">Foto
+            <input id="userPhotoFile" type="file" accept="image/*" hidden>
+          </label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="muted">Nome <input id="userName" value="${qv(me.name)}"></label>
+          <label class="muted">Telefone <input id="userPhone" value="${qv(me.phone)}"></label>
+          <label class="muted">E-mail <input id="userMail" type="email" value="${qv(me.email)}"></label>
+        </div>
+        <label class="muted" style="display:block;margin-top:10px">Concurso <input id="userExam" value="${qv(me.exam)}"></label>
+        <label class="muted" style="display:block;margin-top:10px">Apresentação <textarea id="userAbout" rows="3">${qv(me.about)}</textarea></label>
+        <p class="muted" style="margin-top:12px">Metodologia</p>
+        <div class="row">
+          ${[["questoes", "Questões"], ["teoria", "Teoria"], ["pdf", "PDF"]].map(([id, lab]) =>
+            `<button type="button" class="btn ${metodo === id ? "" : "ghost"}" data-metodo="${id}">${lab}</button>`
+          ).join("")}
+        </div>
+        <label class="muted" style="display:block;margin-top:10px">Foco do planejamento <textarea id="userFoco" rows="2">${qv(me.foco)}</textarea></label>
+        <label class="muted" style="display:block;margin-top:10px">Meta de questões na semana <input id="userMetaQ" type="number" min="0" value="${Number(me.metaQ) || 0}"></label>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="row" style="justify-content:space-between">
+          <strong>Frequência</strong>
+          <span class="muted">Última entrada: ${lastTxt}</span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          ${[7, 15, 30].map((n) => `<button type="button" class="btn freq-btn ${win === n ? "on" : "ghost"}" data-freq="${n}">${n} dias</button>`).join("")}
+        </div>
+        <p class="kpi">${inWin.length}</p>
+        <p class="muted">entradas nos últimos ${win} dias</p>
+      </div>
+      <div class="card">
+        <div class="muted">GRAU DE EVOLUÇÃO</div>
+        <p style="margin:8px 0 0">Desempenho geral</p>
+        <div class="kpi">${parts.length ? geral + "%" : "0%"}</div>
+        <p class="muted">${parts.length ? "Questões e simulados somados." : "sem dados"}</p>
+        <p style="margin:12px 0 0">Questões da semana</p>
+        <div class="bar cyan"><i style="width:${q.score || 0}%"></i></div>
+        <p class="muted">${q.n ? q.hits + " acertos em " + q.n + " · meta " + (q.goal || "—") : "sem dados"}</p>
+        <p style="margin:12px 0 0">Simulados</p>
+        <div class="bar blue"><i style="width:${sim.score || 0}%"></i></div>
+        <p class="muted">${sim.tot ? sim.pts + "/" + sim.tot + " pts" : "sem dados"}</p>
+      </div>
+    `;
+  },
 };
 
 function rowDisc(d) {
@@ -1334,6 +1455,41 @@ document.addEventListener("click", (e) => {
   }
   const nav = e.target.closest("[data-nav]");
   if (nav) { page = nav.dataset.nav; $("side").classList.remove("open"); render(); }
+  if (e.target.closest("#userChip")) { page = "usuario"; $("side").classList.remove("open"); render(); return; }
+  const modo = e.target.closest("[data-modo]");
+  if (modo) {
+    const mi = Number(modo.dataset.meta);
+    const si = Number(modo.dataset.slot);
+    const cid = modo.dataset.ciclo;
+    const slot = S.board && S.board[mi] && S.board[mi].slots[si];
+    if (slot) {
+      slot[cid] = Object.assign(blankCell(), slot[cid] || {});
+      slot[cid].modo = modo.dataset.modo;
+      S.planMode = "manual";
+      save(S);
+      render();
+    }
+    return;
+  }
+  const feito = e.target.closest("[data-feito]");
+  if (feito) {
+    const mi = Number(feito.dataset.meta);
+    const si = Number(feito.dataset.slot);
+    const cid = feito.dataset.ciclo;
+    const slot = S.board && S.board[mi] && S.board[mi].slots[si];
+    if (slot) {
+      slot[cid] = Object.assign(blankCell(), slot[cid] || {});
+      slot[cid].feito = slot[cid].feito === feito.dataset.feito ? "" : feito.dataset.feito;
+      S.planMode = "manual";
+      save(S);
+      render();
+    }
+    return;
+  }
+  const met = e.target.closest("[data-metodo]");
+  if (met) { S.me.metodo = met.dataset.metodo; save(S); render(); return; }
+  const freq = e.target.closest("[data-freq]");
+  if (freq) { S.me.freqWin = Number(freq.dataset.freq); save(S); render(); return; }
   const go = e.target.closest("[data-go]");
   if (go) { page = go.dataset.go; render(); }
   if (e.target.id === "menu" || (e.target.closest && e.target.closest("#menu"))) {
@@ -1637,6 +1793,29 @@ document.addEventListener("input", (e) => {
   if (e.target.dataset && e.target.dataset.sheet) paintSheetTotals();
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "userPhotoFile" && e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = 128; c.height = 128;
+        const ctx = c.getContext("2d");
+        const k = Math.max(128 / img.width, 128 / img.height);
+        const w = img.width * k;
+        const h = img.height * k;
+        ctx.drawImage(img, (128 - w) / 2, (128 - h) / 2, w, h);
+        S.me.photo = c.toDataURL("image/jpeg", 0.82);
+        save(S);
+        render();
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+    return;
+  }
   if (e.target.id === "topFile" && e.target.files && e.target.files[0]) {
     const file = e.target.files[0];
     const reader = new FileReader();

@@ -7,7 +7,7 @@
   <title>Planilha Inteligente</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./logo-pi.svg" />
-  <link rel="stylesheet" href="./styles.css?v=26" />
+  <link rel="stylesheet" href="./styles.css?v=27" />
 </head>
 <body>
   <canvas id="nebula" aria-hidden="true"></canvas>
@@ -52,11 +52,10 @@
   <div class="app">
     <aside class="side" id="side">
       <div class="brand">
-        <img class="brand-logo lg" src="./logo-pi.svg" alt="Planilha Inteligente">
-        <div class="brand-copy">
-          <strong class="brand-abrev">P.I.</strong>
-          <div class="brand-title" id="whoami">Planilha Inteligente</div>
-        </div>
+        <button type="button" id="userChip" class="user-chip" title="Usuário">
+          <img id="userPhoto" class="brand-logo lg" src="./logo-pi.svg" alt="">
+          <span class="user-chip-name" id="userChipName">Seu nome</span>
+        </button>
         <button type="button" id="menu" class="side-arrow" aria-label="Recolher barra">‹</button>
       </div>
       <nav>
@@ -131,7 +130,7 @@
   <script src="./projetos/gcm-nisia.js"></script>
   <script src="./projetos/modelo.js"></script>
   <script src="./gpu.js?v=3"></script>
-  <script src="./app.js?v=17"></script>
+  <script src="./app.js?v=18"></script>
   <script src="./session.js?v=16"></script>
 </body>
 </html>
