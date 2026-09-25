@@ -990,6 +990,42 @@ async function textFromPdf(buf) {
     });
     out += line.trim() + "\n";
   }
+  if (out.replace(/\s/g, "").length >= 80) return out;
+  return ocrPdf(doc);
+}
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return new Promise((ok, fail) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    s.onload = () => ok(window.Tesseract);
+    s.onerror = fail;
+    document.head.appendChild(s);
+  });
+}
+async function ocrPdf(doc) {
+  const Tesseract = await loadTesseract();
+  const worker = await Tesseract.createWorker("por", 1, {
+    workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+    corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core-simd-lstm.wasm.js",
+    langPath: "https://tessdata.projectnaptha.com/4.0.0",
+  });
+  let out = "";
+  const n = Math.min(doc.numPages, 4);
+  try {
+    for (let i = 1; i <= n; i++) {
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale: 1.8 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      const res = await worker.recognize(canvas);
+      out += (res && res.data && res.data.text ? res.data.text : "") + "\n";
+    }
+  } finally {
+    await worker.terminate();
+  }
   return out;
 }
 function foldTxt(s) {
@@ -2264,6 +2300,9 @@ document.addEventListener("change", (e) => {
     };
     if (/\.pdf$/i.test(file.name)) reader.readAsArrayBuffer(file);
     else reader.readAsText(file);
+    S.editalAviso = "Lendo o arquivo.";
+    page = "edital";
+    render({ force: true });
     e.target.value = "";
     return;
   }
