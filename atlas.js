@@ -481,7 +481,8 @@
     if (e === "origem") return "página bloqueada";
     if (e === "limite") return "muitas consultas, espere um minuto";
     if (e === "pedido incompleto") return "pedido incompleto";
-    if (e === "corpo") return "pergunta grande demais";
+    if (/bloqueada/i.test(e)) return "resposta bloqueada";
+    if (/modelo indispon/i.test(e)) return "modelo indisponível";
     return "sem resposta";
   }
   function askModel(which, key, prompt) {
@@ -517,15 +518,11 @@
   function askAll(raw) {
     var p = prefs();
     var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
-    var models = [
-      { id: "chatgpt", which: "openai", key: oauthMem.chatgpt || p.chatgpt || p.openai },
-      { id: "claude", which: "claude", key: oauthMem.claude || p.claude },
-      { id: "gemini", which: "gemini", key: oauthMem.gemini || p.gemini },
-      { id: "copilot", which: "copilot", key: oauthMem.copilot || p.copilot },
-    ].filter(function (m) { return on[m.id] !== false && m.key; });
-    if (!models.length) {
-      return Promise.resolve({ say: "Nenhuma chave neste aparelho. Cole a chave da IA e deixe o botão aceso.", precision: 0, votes: [] });
+    var key = String(oauthMem.gemini || p.gemini || "").trim();
+    if (!key || on.gemini === false) {
+      return Promise.resolve({ say: "Cole a chave da Gemini neste aparelho e deixe o botão Gemini aceso.", precision: 0, votes: [] });
     }
+    var models = [{ id: "gemini", which: "gemini", key: key }];
     var facts = "";
     try {
       var pulseNow = pulse();

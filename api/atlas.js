@@ -1,5 +1,40 @@
 import { guard } from "../lib/api-firewall.js";
 
+export function geminiText(j) {
+  const list = ((((j || {}).candidates || [])[0] || {}).content || {}).parts || [];
+  const visible = list.filter((p) => p && p.text && !p.thought).map((p) => p.text).join("").trim();
+  if (visible) return visible;
+  return list.map((p) => (p && p.text) || "").join("").trim();
+}
+
+async function geminiAnswer(key, prompt) {
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash"];
+  let last = { text: "", error: { message: "modelo indisponível" } };
+  for (const model of models) {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    const text = geminiText(j);
+    if (r.ok && text) return { text: text, error: null };
+    const msg = (j.error && (j.error.message || j.error.status)) || "";
+    if (/API key not valid|API_KEY_INVALID|invalid api key/i.test(msg)) {
+      return { text: "", error: { message: "Incorrect API key", code: "invalid_api_key" } };
+    }
+    if (j.promptFeedback && j.promptFeedback.blockReason) {
+      return { text: "", error: { message: "bloqueada" } };
+    }
+    last = { text: "", error: j.error || { message: msg || "sem resposta" } };
+    if (!/not found|NOT_FOUND|is not supported/i.test(msg)) break;
+  }
+  return last;
+}
+
 export default async function handler(req, res) {
   if (!guard(req, res, { methods: ["POST"], limit: 20, max: 12000, requireOrigin: true })) return;
   const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -12,16 +47,8 @@ export default async function handler(req, res) {
   }
   try {
     if (which === "gemini") {
-      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + encodeURIComponent(key), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      });
-      const j = await r.json();
-      const text = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts
-        ? j.candidates[0].content.parts.map((p) => p.text || "").join("")
-        : "";
-      res.status(r.ok ? 200 : 502).json({ text: text, error: j.error || null });
+      const out = await geminiAnswer(key, prompt);
+      res.status(out.text ? 200 : 502).json(out);
       return;
     }
     if (which === "claude") {
