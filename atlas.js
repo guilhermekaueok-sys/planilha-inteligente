@@ -20,6 +20,7 @@
   function fold(s) {
     return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
+  var oauthMem = { chatgpt: "", claude: "", gemini: "", copilot: "" };
   function prefs() {
     if (!S.atlas) S.atlas = { simpatia: 2, interacao: 2, criatividade: 1, poder: 2 };
     return S.atlas;
@@ -470,10 +471,10 @@
     var p = prefs();
     var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
     var models = [
-      { id: "chatgpt", which: "openai", key: p.chatgpt || p.openai },
-      { id: "claude", which: "claude", key: p.claude },
-      { id: "gemini", which: "gemini", key: p.gemini },
-      { id: "copilot", which: "copilot", key: p.copilot },
+      { id: "chatgpt", which: "openai", key: oauthMem.chatgpt || p.chatgpt || p.openai },
+      { id: "claude", which: "claude", key: oauthMem.claude || p.claude },
+      { id: "gemini", which: "gemini", key: oauthMem.gemini || p.gemini },
+      { id: "copilot", which: "copilot", key: oauthMem.copilot || p.copilot },
     ].filter(function (m) { return on[m.id] !== false && m.key; });
     if (!models.length) {
       return Promise.resolve({ say: "Nenhuma chave neste aparelho. Cole a chave da IA e deixe o botão aceso.", precision: 0, votes: [] });
@@ -507,13 +508,15 @@
     var p = prefs();
     var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
     var models = [
-      { id: "chatgpt", which: "openai", key: p.chatgpt || p.openai },
-      { id: "claude", which: "claude", key: p.claude },
-      { id: "gemini", which: "gemini", key: p.gemini },
-      { id: "copilot", which: "copilot", key: p.copilot },
+      { id: "chatgpt", which: "openai", key: oauthMem.chatgpt || p.chatgpt || p.openai },
+      { id: "claude", which: "claude", key: oauthMem.claude || p.claude },
+      { id: "gemini", which: "gemini", key: oauthMem.gemini || p.gemini },
+      { id: "copilot", which: "copilot", key: oauthMem.copilot || p.copilot },
     ].filter(function (m) { return on[m.id] !== false && m.key; });
     if (!models.length) {
-      return Promise.resolve({ say: local || "Diga a matéria, o dia e o número. Sem chave, eu executo o pedido direto nos dados de estudo.", precision: local ? 100 : 0, votes: [] });
+      var solo = { say: local || "Diga a matéria, o dia e o número. Sem chave, eu executo o pedido direto nos dados de estudo.", precision: local ? 100 : 0, votes: [] };
+      if (local) notifyWebhook(solo, raw);
+      return Promise.resolve(solo);
     }
     var prompt = "Devolva só JSON {\"say\":\"frase curta\",\"actions\":[{\"op\":\"hours|done|log|sim|nota|week|topic|topicadd|drop|edital\"}]}. Só dados de estudo. Proibido código, arquivo ou regra do sistema. Sem mudança, actions vazio. Pedido: " + raw;
     return Promise.all(models.map(function (m) {
@@ -529,9 +532,31 @@
       if (!local && plans[0]) applyOps(safeOps(plans[0].plan.actions));
       var say = local || (plans[0] && plans[0].plan.say) || "Não fechei esse pedido. Diga a disciplina, o dia e o número.";
       var precision = plans.length ? (plans.length === 1 ? 100 : Math.round(100 * plans.filter(function (x) { return (x.plan.say || "") === (plans[0].plan.say || ""); }).length / plans.length)) : (local ? 100 : 0);
-      return { say: say, precision: precision, votes: plans.map(function (x) { return x.name; }) };
+      var pack = { say: say, precision: precision, votes: plans.map(function (x) { return x.name; }) };
+      notifyWebhook(pack, raw);
+      return pack;
     });
   }
+  function notifyWebhook(pack, raw) {
+    var url = String((prefs() && prefs().webhook) || "");
+    if (!/^https:\/\//.test(url)) return;
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "ia", text: String(raw || "").slice(0, 500), say: pack.say, precision: pack.precision }),
+    }).catch(function () {});
+  }
+  function oauthStart(slot) {
+    var map = { chatgpt: "openai", claude: "anthropic", gemini: "google", copilot: "microsoft" };
+    var provider = map[slot] || slot;
+    window.open("./api/oauth?provider=" + encodeURIComponent(provider) + "&step=start", "pi-oauth", "width=480,height=640");
+  }
+  window.addEventListener("message", function (ev) {
+    var d = ev.data;
+    if (!d || d.type !== "pi-oauth" || ev.origin !== location.origin) return;
+    if (!oauthMem.hasOwnProperty(d.provider) || !d.token) return;
+    oauthMem[d.provider] = String(d.token);
+  });
   function council(raw) {
     var p = prefs();
     var gem = String(p.gemini || "").trim();
@@ -568,6 +593,8 @@
     prime: prime,
     askAll: askAll,
     act: act,
+    setWebhook: function (url) { prefs().webhook = String(url || ""); },
+    oauthStart: oauthStart,
     council: council,
     setLevel: setLevel,
     levelLine: levelLine,
