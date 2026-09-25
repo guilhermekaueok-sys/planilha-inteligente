@@ -142,6 +142,11 @@
     messages: roomLoad(),
     paint(log) {
       const list = this.messages.slice(-40);
+      const sig = list.length
+        ? list.map((m) => (m.id || "") + "|" + (m.ts || "") + "|" + (m.text || "")).join("\n")
+        : "empty";
+      if (log.dataset.sig === sig) return;
+      log.dataset.sig = sig;
       if (!list.length) {
         log.innerHTML = `<div class="dock-msg them"><span class="who">sala</span>Turma ao vivo. Quem está online vê a mesma conversa.</div>`;
       } else {

@@ -655,6 +655,9 @@ function paintDock() {
   const pal = S.chatWith;
   const thread = (pal && S.chats[pal]) || [];
   const fallback = thread.length ? thread.slice(-16) : [{ from: "them", text: "Chat ligado à planilha. Ex.: segunda port infor rlm · q port 20 15 · ajuda" }];
+  const sig = "local:" + fallback.map((m) => (m.ts || "") + "|" + (m.text || "")).join("\n");
+  if (log.dataset.sig === sig) return;
+  log.dataset.sig = sig;
   log.innerHTML = fallback.map((m) => `<div class="dock-msg ${m.from}">${m.text}</div>`).join("");
   log.scrollTop = log.scrollHeight;
 }
