@@ -1011,17 +1011,22 @@ function limparCarimbo(canvas, modo) {
     const r = d[i];
     const g = d[i + 1];
     const b = d[i + 2];
-    const y = 0.299 * r + 0.587 * g + 0.114 * b;
-    const vermelho = r > g + 28 && r > b + 18;
-    const azul = b > r + 22 && b > g + 12;
-    let v = y;
-    if ((vermelho || azul) && y > 150) v = 255;
-    else v = Math.max(0, Math.min(255, (y - 128) * 1.45 + 128));
-    if (modo === "impresso") v = v > 168 ? 255 : 0;
+    let v = Math.max(r, g, b);
+    v = Math.max(0, Math.min(255, (v - 128) * 1.7 + 128));
+    if (modo === "binario") v = v > 150 ? 255 : 0;
     d[i] = d[i + 1] = d[i + 2] = v;
   }
   ctx.putImageData(img, 0, 0);
   return canvas;
+}
+function notaOcr(t) {
+  const s = String(t || "");
+  let n = (s.match(/\d{2}\/\d{2}\/\d{4}/g) || []).length * 5;
+  if (/taxa/i.test(s) && /R\$/.test(s)) n += 4;
+  if (/cargo/i.test(s)) n += 2;
+  if (/conte[uú]do program[aá]tico/i.test(s)) n += 3;
+  if (/inscri/i.test(s)) n += 2;
+  return n;
 }
 function copiarCanvas(src) {
   const c = document.createElement("canvas");
@@ -1050,25 +1055,34 @@ async function ocrPdf(doc) {
   try {
     for (let i = 1; i <= n; i++) {
       const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 2 });
+      const viewport = page.getViewport({ scale: 2.6 });
       const base = document.createElement("canvas");
       base.width = Math.floor(viewport.width);
       base.height = Math.floor(viewport.height);
       await page.render({ canvasContext: base.getContext("2d"), viewport }).promise;
-      const impresso = limparCarimbo(copiarCanvas(base), "impresso");
-      await worker.setParameters({ tessedit_pageseg_mode: "6" });
-      const a = await worker.recognize(impresso);
-      let pageText = a && a.data && a.data.text ? a.data.text : "";
-      const datas = pageText.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
-      if (datas.length < 2) {
-        const manuscrito = limparCarimbo(copiarCanvas(base), "manuscrito");
-        await worker.setParameters({ tessedit_pageseg_mode: "11" });
-        const b = await worker.recognize(manuscrito);
-        const extra = b && b.data && b.data.text ? b.data.text : "";
-        const nota = (t) => ((t.match(/\d{2}\/\d{2}\/\d{4}/g) || []).length * 3) + ((t.match(/R\$\s*[\d.]+,00/g) || []).length);
-        pageText = nota(extra) > nota(pageText) ? extra : pageText;
+      const imgs = [
+        limparCarimbo(copiarCanvas(base), "max"),
+        limparCarimbo(copiarCanvas(base), "binario"),
+      ];
+      let best = "";
+      let bestN = -1;
+      for (let k = 0; k < imgs.length; k++) {
+        const modos = k === 0 ? ["4", "6"] : ["6"];
+        for (let p = 0; p < modos.length; p++) {
+          await worker.setParameters({
+            tessedit_pageseg_mode: modos[p],
+            user_defined_dpi: "300",
+            preserve_interword_spaces: "1",
+          });
+          const res = await worker.recognize(imgs[k]);
+          const text = arranjarOcr(res && res.data && res.data.text ? res.data.text : "");
+          const n = notaOcr(text);
+          if (n > bestN) { best = text; bestN = n; }
+          if (bestN >= 14) break;
+        }
+        if (bestN >= 14) break;
       }
-      out += arranjarOcr(pageText) + "\n";
+      out += best + "\n";
     }
   } finally {
     await worker.terminate();

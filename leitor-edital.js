@@ -138,9 +138,12 @@
     return "";
   }
   function detectarTaxa(texto) {
-    var m = texto.match(/taxa\s+de\s+inscri[cç][aã]o[\s\S]{0,180}?(R\$\s*[\d.]+,\d{2})/i)
-      || texto.match(/(?:valor|import[aâ]ncia)\s+(?:da\s+)?taxa[\s\S]{0,80}?(R\$\s*[\d.]+,\d{2})/i);
-    return m ? m[1].replace(/\s+/g, " ") : "";
+    var m = texto.match(/taxa\s+de\s+inscri[cç][aã]o[\s\S]{0,180}?(R\$\s*[\d.]+[.,]\d{2})/i)
+      || texto.match(/(?:valor|import[aâ]ncia)\s+(?:da\s+)?taxa[\s\S]{0,80}?(R\$\s*[\d.]+[.,]\d{2})/i);
+    if (!m) return "";
+    var v = m[1].replace(/\s+/g, " ");
+    if (/^R\$\s*\d+\.\d{2}$/.test(v)) v = v.replace(".", ",");
+    return v;
   }
   function extrairBlocoConteudo(texto) {
     var forte = [
