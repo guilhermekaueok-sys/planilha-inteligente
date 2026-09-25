@@ -1,4 +1,4 @@
-/* ATLAS — mentor da planilha. Comando de sistema não sai deste aparelho. */
+/* Ponte com as IAs externas. A resposta vem da API cadastrada, não de um modelo interno. */
 (function () {
   var BASE = {
     cargo: "Guarda Civil Municipal de Nísia Floresta",
@@ -29,12 +29,7 @@
     return (S.me && S.me.name) || "concurseiro";
   }
   function tone(body) {
-    var p = prefs();
-    var line = body;
-    if (p.simpatia >= 2) line = nome().split(" ")[0] + ", " + body.charAt(0).toLowerCase() + body.slice(1);
-    if (p.criatividade >= 2 && p.interacao >= 1) line += " O que pesa na prova vem primeiro.";
-    if (p.interacao >= 3) line += " Quer que eu lance o próximo bloco?";
-    return line;
+    return body;
   }
   function pulse() {
     var q = typeof weekQuestionScore === "function" ? weekQuestionScore() : { n: 0, hits: 0, score: 0 };
@@ -275,15 +270,9 @@
     var hit = intent(raw);
     if (!hit) return null;
     if (hit.write && Number(prefs().poder) < 1) {
-      return tone("O poder de acesso está em zero. Eu oriento, mas não altero a planilha.");
+      return "O poder de acesso está em zero. A planilha não é alterada.";
     }
-    if (hit.k === "hi") return tone("Pode falar. Eu lanço hora, questão, simulado e nota quando você pedir.");
-    if (hit.k === "score") {
-      var p = pulse();
-      return tone("Desempenho geral " + p.geral + "%. Questões " + p.qScore + "%. Horas " + p.hoursDone + " de " + p.hoursPlan + ". Disciplinas estudadas " + p.studied + " de " + p.planned + ".");
-    }
-    if (hit.k === "edital") return tone(editalFala());
-    if (hit.k === "radar") return tone("No radar: São Gonçalo, Paulínia e Reriutaba seguem abertos. A sua prova da GCM Nísia continua em 6 de dezembro.");
+    if (hit.k === "hi" || hit.k === "score" || hit.k === "radar" || hit.k === "edital") return null;
     if (hit.k === "ops") {
       var done = applyOps(hit.actions);
       if (!done.length) return tone("Não fechei disciplina ou dia. Repita com o nome da matéria.");
@@ -357,10 +346,10 @@
   function levelLine(key) {
     var n = Number(prefs()[key]);
     var lines = {
-      simpatia: ["Simpatia no mínimo. Sigo seco e objetivo.", "Simpatia em um. Direto, sem rodeio.", "Simpatia em dois. Estou com você na jornada.", "Simpatia no alto. Pode contar comigo em cada bloco."],
-      interacao: ["Interação baixa. Respondo curto.", "Interação em um.", "Interação em dois. Eu devolvo o próximo passo.", "Interação no alto. Eu puxo o bloco seguinte."],
-      criatividade: ["Criatividade baixa. Só o dado.", "Criatividade em um.", "Criatividade em dois. Eu lembro o que pesa na prova.", "Criatividade no alto."],
-      poder: ["Poder zero. Eu oriento e não altero a planilha.", "Poder em um. Altero só o que você pedir com clareza.", "Poder em dois. Lanço hora, questão, nota e simulado quando você pedir.", "Poder no alto. Se você pedir direto, eu altero o dado na planilha."],
+      simpatia: ["Simpatia no mínimo.", "Simpatia em um.", "Simpatia em dois.", "Simpatia no alto."],
+      interacao: ["Interação baixa.", "Interação em um.", "Interação em dois.", "Interação no alto."],
+      criatividade: ["Criatividade baixa.", "Criatividade em um.", "Criatividade em dois.", "Criatividade no alto."],
+      poder: ["Poder zero. A planilha não é alterada.", "Poder em um.", "Poder em dois.", "Poder no alto."],
     };
     return (lines[key] || lines.simpatia)[Math.max(0, Math.min(3, n))];
   }
@@ -523,7 +512,13 @@
     if (!models.length) {
       return Promise.resolve({ say: "Nenhuma chave neste aparelho. Cole a chave da IA e deixe o botão aceso.", precision: 0, votes: [] });
     }
-    var prompt = "Responda em português do Brasil, direto, à pergunta do usuário. Pode explicar matéria, lei, jurisprudência, dica de prova e qualquer dúvida. Não exija disciplina, dia ou número. Não recuse a pergunta. Não invente número da planilha dele. Pergunta: " + raw;
+    var facts = "";
+    try {
+      var pulseNow = pulse();
+      var ed = (typeof S !== "undefined" && S && S.editalLido) || {};
+      facts = " Contexto da planilha, use só se a pergunta pedir: desempenho " + pulseNow.geral + "%; questões " + pulseNow.qScore + "%; horas " + pulseNow.hoursDone + " de " + pulseNow.hoursPlan + "; cargo " + (ed.cargo || "não informado") + "; banca " + (ed.banca || "não informada") + ".";
+    } catch (e) {}
+    var prompt = "Você é a IA externa cadastrada na plataforma. Responda em português do Brasil, direto, à pergunta. Pode explicar matéria, lei e dúvida de prova. Não se apresente como Atlas. Não exija disciplina, dia ou número. Não invente número que não esteja no contexto. Pergunta: " + raw + facts;
     return Promise.all(models.map(function (m) {
       return askModel(m.which, m.key, prompt).then(function (text) {
         return { name: m.id, text: String(text || "").trim() };
@@ -622,7 +617,7 @@
     var gem = String(p.gemini || "").trim();
     var oai = String(p.openai || "").trim();
     if (!gem && !oai) return Promise.resolve(null);
-    var brief = "Você é o ATLAS, mentor de concurso, voz masculina, curta, sem rodeio. Disciplinas: " + catalog() + ". Dias: seg ter qua qui sex sab dom. Devolva só JSON {\"say\":\"frase em português\",\"actions\":[{\"op\":\"hours|done|log|sim|nota|week|topic\",\"disc\":\"\",\"day\":\"\",\"horas\":0,\"n\":0,\"hits\":0,\"nome\":\"\",\"data\":\"AAAA-MM-DD\",\"pontos\":0,\"total\":0,\"discs\":[],\"nota\":\"\",\"n\":1,\"id\":\"\",\"st\":\"\"}]}. Sem alteração, actions vazio. Pedido do concurseiro: " + raw;
+    var brief = "Responda como a IA externa cadastrada. Não se apresente como Atlas. Disciplinas: " + catalog() + ". Dias: seg ter qua qui sex sab dom. Devolva só JSON {\"say\":\"frase em português\",\"actions\":[{\"op\":\"hours|done|log|sim|nota|week|topic\",\"disc\":\"\",\"day\":\"\",\"horas\":0,\"n\":0,\"hits\":0,\"nome\":\"\",\"data\":\"AAAA-MM-DD\",\"pontos\":0,\"total\":0,\"discs\":[],\"nota\":\"\",\"n\":1,\"id\":\"\",\"st\":\"\"}]}. Sem alteração, actions vazio. Pedido: " + raw;
     var first = gem ? askModel("gemini", gem, brief) : askModel("openai", oai, brief);
     return first.then(function (draft) {
       if (!gem || !oai) return draft;
