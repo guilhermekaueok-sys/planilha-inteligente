@@ -1020,8 +1020,11 @@ const pages = {
     const hScore = pulse && pulse.hoursPlan ? pulse.hScore : 0;
     return `
       <div class="hero-title">
-        <h1>DESEMPENHO GERAL</h1>
-        <p class="muted">Semana ${S.week}</p>
+        <div>
+          <h1>DESEMPENHO GERAL</h1>
+          <p class="muted">Semana ${S.week}</p>
+        </div>
+        <div class="news-rail" aria-label="Radar de notícias">${window.PIRadar ? PIRadar.mini() : ""}</div>
       </div>
       <div class="dash-hero">
         <div class="card ring-card">
@@ -1120,24 +1123,12 @@ const pages = {
     `;
   },
   radar() {
+    const stamp = new Date().toLocaleDateString("pt-BR");
     return `
-      <p class="kicker">RADAR DE CONCURSOS · 25/09/2026</p>
+      <p class="kicker">RADAR · ${stamp}</p>
       <h1>RADAR DE CONCURSOS</h1>
-      <p class="sub">Editais abertos, previstos e banca já definida. A barra abaixo continua sendo o peso da sua prova.</p>
-      <div class="disc-board" style="margin-bottom:12px">${window.ATLAS ? ATLAS.radarHtml() : ""}</div>
-      <p class="sub">Barra mint = importância na prova. O texto à direita é o peso oficial, não o seu acerto.</p>
-      <div class="disc-board">
-      ${[...DISC].sort((a,b)=>importance(b)-importance(a)).map((d) => {
-        return `<article class="card disc-item">
-          <div class="row" style="justify-content:space-between">
-            <strong>${d.sigla}</strong>
-            <span class="muted">${d.pts} pts</span>
-          </div>
-          <div class="muted">${d.name}</div>
-          <div class="bar"><i style="width:${Math.round(importance(d)*100)}%"></i></div>
-        </article>`;
-      }).join("")}
-      </div>
+      <p class="sub">Só notícias. Abertos, iminentes ou em prova. O que passar de 12 dias sai sozinho.</p>
+      <div class="news-board">${window.PIRadar ? PIRadar.page() : ""}</div>
     `;
   },
   edital() {
@@ -2051,6 +2042,7 @@ try {
   }
 } catch (_) {}
 render({ force: true });
+if (window.PIRadar) PIRadar.refresh().then((changed) => { if (changed && (page === "comando" || page === "radar")) render({ force: true }); });
 readDisk().then((disk) => {
   if (window.__piUserLock || (S.entered && S.me && S.me.email)) return;
   if (!disk || !disk.raw) {

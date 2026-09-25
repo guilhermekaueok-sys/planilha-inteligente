@@ -244,7 +244,25 @@ h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 6px 0 8px; letter-spacing: -.0
 .dash-hero { display: grid; grid-template-columns: 1.05fr .9fr 1fr; gap: 12px; }
 .dash-hero .ring-card { grid-row: span 2; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
 .dash-hero .stack { display: grid; gap: 12px; }
+.hero-title { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(240px, 46%); gap: 16px; align-items: center; }
 .hero-title h1 { margin: 0 0 4px; font-size: 1.7rem; }
+.news-rail { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; min-width: 0; }
+.news-chip, .news-card {
+  border: 1px solid var(--line); border-left: 3px solid var(--src, #3ce6ff);
+  background: rgba(8,14,28,.72); color: inherit; text-decoration: none;
+}
+.news-chip { flex: 0 0 168px; border-radius: 12px; padding: 6px 8px; }
+.news-chip span, .news-src { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--src, #bff6ff); }
+.news-chip b { display: block; margin-top: 2px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-board { display: grid; gap: 12px; }
+.news-card { display: block; border-radius: 16px; padding: 14px 16px; }
+.news-card strong { display: block; margin: 8px 0 4px; font-size: 1.05rem; }
+.news-card p { margin: 0; color: #d5e4f5; }
+.src-qc { --src: #ff8a3d; }
+.src-est { --src: #6ea2ff; }
+.src-gran { --src: #ff5d6c; }
+.src-ape { --src: #3ddc97; }
+.src-g1 { --src: #ff4d4d; }
 .kpi.huge { font-size: 3rem; line-height: 1; margin: 6px 0; }
 .stars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stars b { display: block; color: var(--mint); }
@@ -605,7 +623,7 @@ body.view-blocos .room-anki .topic {
 @media (max-width: 1100px) {
   .dock { display: none; }
   .dock.open { display: flex; }
-  .dash, .dash-hero { grid-template-columns: 1fr; }
+  .dash, .dash-hero, .hero-title { grid-template-columns: 1fr; }
   .dash-hero .ring-card { grid-row: auto; }
   .main { padding-right: 20px; }
 }
