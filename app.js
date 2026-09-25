@@ -564,6 +564,23 @@ function closeIaModal() {
   overlay.classList.remove("show");
   setTimeout(() => { if (!overlay.classList.contains("show")) overlay.hidden = true; }, 380);
 }
+function openMetric(id) {
+  const overlay = $("metricOverlay");
+  const body = $("metricBody");
+  const title = $("metricTitle");
+  if (!overlay || !body) return;
+  const note = metricNote(id);
+  if (title) title.textContent = note.title;
+  body.innerHTML = `<p class="ia-precision">${note.pct}%</p><p class="ia-say">${iaText(note.formula)}</p><p>${iaText(note.raw)}</p><p class="muted">Última atualização: ${iaText(note.when)}</p>`;
+  overlay.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add("show")));
+}
+function closeMetric() {
+  const overlay = $("metricOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("show");
+  setTimeout(() => { if (!overlay.classList.contains("show")) overlay.hidden = true; }, 320);
+}
 const TOUR = [
   { page: "comando", text: "Aqui é o Comando. A fila sobe o que pesa na prova e ainda está fraco no seu acerto." },
   { page: "radar", text: "No Radar você vê importância × nível. Barra menta = peso. Texto = seu desempenho." },
@@ -636,6 +653,69 @@ async function pullMestre() {
 }
 
 function freq(d) { return d.editais / d.n; }
+function metricState() {
+  const pulse = window.ATLAS ? ATLAS.pulse() : { geral: 0, qScore: 0, hScore: 0, dScore: 0, q: { n: 0, hits: 0 }, hoursPlan: 0, hoursDone: 0, planned: 0, studied: 0, missed: 0 };
+  const sumLogs = (ids) => ids.reduce((a, id) => {
+    const l = logOf(id);
+    a.n += l.n;
+    a.hits += l.hits;
+    return a;
+  }, { n: 0, hits: 0 });
+  const lowIds = DISC.filter((d) => d.pesoOf === 1).map((d) => d.id);
+  const low = sumLogs(lowIds);
+  const dir = sumLogs(["const", "admin", "penal", "proc", "estat"]);
+  const port = logOf("port");
+  const leg = logOf("legmun");
+  const pctOf = (hits, n) => (n ? Math.round((hits / n) * 100) : 0);
+  const list = Array.isArray(S.userTopics) ? S.userTopics : [];
+  const w = { dominado: 1, revisar: 0.75, andamento: 0.45, pendente: 0 };
+  const sum = list.reduce((a, t) => a + (w[(S.topic && S.topic[t.id]) || "pendente"] || 0), 0);
+  const editalDone = list.filter((t) => S.topic && S.topic[t.id] && S.topic[t.id] !== "pendente").length;
+  const edital = { pct: list.length ? Math.round((sum / list.length) * 100) : 0, done: editalDone, n: list.length };
+  const active = !!(pulse.q.n || pulse.hoursDone || pulse.studied || editalDone || low.n || dir.n || port.n || leg.n);
+  const when = active && S.savedAt ? new Date(S.savedAt).toLocaleString("pt-BR") : "Sem dados registrados";
+  return {
+    pulse,
+    week: pulse.geral,
+    low: pctOf(low.hits, low.n),
+    lowN: low.n,
+    lowHits: low.hits,
+    dir: pctOf(dir.hits, dir.n),
+    dirN: dir.n,
+    dirHits: dir.hits,
+    port: pctOf(port.hits, port.n),
+    portN: port.n,
+    portHits: port.hits,
+    leg: pctOf(leg.hits, leg.n),
+    legN: leg.n,
+    legHits: leg.hits,
+    edital,
+    online: 0,
+    when,
+  };
+}
+function metricNote(id) {
+  const m = metricState();
+  const p = m.pulse;
+  const q = p.q || { n: 0, hits: 0 };
+  const map = {
+    geral: ["Desempenho Geral", "Média ponderada da semana: acertos 50%, horas cumpridas 30% e disciplinas estudadas 20%. O que não tem registro fica de fora. O peso do edital não entra.", q.hits + " acertos em " + q.n + " questões. " + p.hoursDone + "h de " + p.hoursPlan + "h. " + p.studied + " disciplinas estudadas de " + p.planned + ".", m.week],
+    semana: ["Progresso da semana", "Acertos da semana pesam 50%, horas marcadas como estudadas pesam 30% e disciplinas concluídas pesam 20%. Sem registro, o resultado é 0%.", q.hits + " acertos em " + q.n + " questões nesta semana.", m.week],
+    questoes: ["Questões", "Acertos ÷ questões resolvidas na semana.", q.hits + " acertos em " + q.n + " resolvidas nesta semana.", p.qScore],
+    disciplinas: ["Disciplinas", "Disciplinas marcadas como estudadas ÷ disciplinas previstas na meta da semana.", p.studied + " estudadas de " + p.planned + " previstas. " + p.missed + " não estudadas.", p.planned ? p.dScore : 0],
+    horas: ["Horas", "Horas marcadas como batidas ÷ horas previstas na semana.", p.hoursDone + "h batidas de " + p.hoursPlan + "h previstas.", p.hoursPlan ? p.hScore : 0],
+    editais: ["Editais", "Assuntos trabalhados no edital verticalizado, com peso menor para os que estão em andamento.", m.edital.done + " de " + m.edital.n + " assuntos trabalhados.", m.edital.pct],
+    baixo: ["Peso baixo", "Acertos ÷ questões de Português, Raciocínio Lógico e Informática.", m.lowHits + " acertos em " + m.lowN + " questões de peso baixo.", m.low],
+    direito: ["Direito", "Acertos ÷ questões de Constitucional, Administrativo, Penal, Processo Penal e Estatuto das Guardas.", m.dirHits + " acertos em " + m.dirN + " questões de Direito.", m.dir],
+    port: ["Português", "Acertos ÷ questões de Língua Portuguesa na semana.", m.portHits + " acertos em " + m.portN + " questões.", m.port],
+    online: ["Online", "Não há taxa inventada de presença. O 24% antigo era valor fixo e foi retirado.", "0 sessões de estudo online contabilizadas.", 0],
+    portbar: ["Português", "Acertos ÷ questões de Língua Portuguesa na semana.", m.portHits + " acertos em " + m.portN + " questões.", m.port],
+    dirbar: ["Direito", "Acertos ÷ questões do bloco de Direito na semana.", m.dirHits + " acertos em " + m.dirN + " questões.", m.dir],
+    legbar: ["Legislação", "Acertos ÷ questões de legislação municipal na semana.", m.legHits + " acertos em " + m.legN + " questões.", m.leg],
+  };
+  const row = map[id] || map.geral;
+  return { title: row[0], formula: row[1], raw: row[2], pct: row[3], when: m.when };
+}
 function importance(d) {
   return (d.pts / 90) * 0.65 + freq(d) * 0.25 + (d.provas / d.n) * 0.1;
 }
@@ -1027,21 +1107,13 @@ const pages = {
       return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
     })();
     const pulse = window.ATLAS ? ATLAS.pulse() : null;
-    const pct = pulse ? pulse.geral : (avg == null ? 0 : Math.round(avg * 100));
-    const port = rate("port");
-    const dirIds = ["const", "admin", "penal", "proc", "estat"];
-    const dirXs = dirIds.map(rate).filter((x) => x !== null);
-    const dir = dirXs.length ? Math.round(dirXs.reduce((a, b) => a + b, 0) / dirXs.length * 100) : 0;
-    const leg = rate("legmun");
+    const m = metricState();
+    const pct = m.week;
+    const port = m.port;
+    const dir = m.dir;
+    const leg = m.leg;
     const peso = Math.round(importance(top) * 100);
-    const edital = (() => {
-      const list = Array.isArray(S.userTopics) ? S.userTopics : [];
-      if (!list.length) return { pct: 0, done: 0, n: 0 };
-      const w = { dominado: 1, revisar: 0.75, andamento: 0.45, pendente: 0 };
-      const sum = list.reduce((a, t) => a + (w[(S.topic && S.topic[t.id]) || "pendente"] || 0), 0);
-      const done = list.filter((t) => (S.topic && S.topic[t.id] && S.topic[t.id] !== "pendente")).length;
-      return { pct: Math.round((sum / list.length) * 100), done, n: list.length };
-    })();
+    const edital = m.edital;
     const qScore = pulse ? pulse.qScore : 0;
     const dScore = pulse && pulse.planned ? pulse.dScore : 0;
     const hScore = pulse && pulse.hoursPlan ? pulse.hScore : 0;
@@ -1055,28 +1127,28 @@ const pages = {
       </div>
       <div class="dash-hero">
         <div class="card ring-card">
-          <div class="ring" style="--p:${pct}%"><span>
+          <div class="ring metric-hit" data-metric="geral" style="--p:${pct}%"><span>
             <strong class="kpi huge">${pct}%</strong>
             <div class="muted">Desempenho Geral</div>
           </span></div>
           <p class="ring-area">Desempenho em outras áreas da plataforma</p>
           <ul class="ring-meta">
-            <li>
+            <li class="metric-hit" data-metric="questoes">
               <div class="ring-line"><span>Questões</span><b>${qScore}%</b></div>
               <div class="muted">${pulse && pulse.q ? pulse.q.hits : 0} acertos em ${pulse && pulse.q ? pulse.q.n : 0} resolvidas</div>
               <div class="bar"><i style="width:${Math.max(0, Math.min(100, qScore))}%"></i></div>
             </li>
-            <li>
+            <li class="metric-hit" data-metric="disciplinas">
               <div class="ring-line"><span>Disciplinas</span><b>${pulse ? pulse.studied : 0}/${pulse ? pulse.planned : 0}</b></div>
               <div class="muted">${pulse ? pulse.studied : 0} estudadas na meta · ${pulse ? pulse.missed : 0} não estudadas</div>
               <div class="bar cyan"><i style="width:${Math.max(0, Math.min(100, dScore))}%"></i></div>
             </li>
-            <li>
+            <li class="metric-hit" data-metric="horas">
               <div class="ring-line"><span>Horas</span><b>${hScore}%</b></div>
               <div class="muted">${pulse ? pulse.hoursDone : 0}h batidas de ${pulse ? pulse.hoursPlan : 0}h previstas</div>
               <div class="bar blue"><i style="width:${Math.max(0, Math.min(100, hScore))}%"></i></div>
             </li>
-            <li>
+            <li class="metric-hit" data-metric="editais">
               <div class="ring-line"><span>Editais</span><b>${edital.pct}%</b></div>
               <div class="muted">${edital.done} de ${edital.n} assuntos trabalhados</div>
               <div class="bar violet"><i style="width:${edital.pct}%"></i></div>
@@ -1084,16 +1156,16 @@ const pages = {
           </ul>
         </div>
         <div class="stack">
-          <div class="card">
+          <div class="card metric-hit" data-metric="semana">
             <div class="muted">PROGRESSO · SEMANA</div>
-            <div class="kpi">${Math.max(pct, peso)}% · ${top.pts} pts</div>
-            <div class="bar"><i style="width:${Math.min(100, Math.max(pct, 8))}%"></i></div>
+            <div class="kpi">${m.week}% · ${pulse && pulse.q ? pulse.q.hits : 0} pts</div>
+            <div class="bar"><i style="width:${Math.max(0, Math.min(100, m.week))}%"></i></div>
           </div>
           <div class="card stars">
-            <div><b>0%</b><span class="muted">Peso baixo</span></div>
-            <div><b>${dir}%</b><span class="muted">Direito</span></div>
-            <div><b>${port == null ? 0 : Math.round(port * 100)}%</b><span class="muted">Português</span></div>
-            <div class="onair"><b>${liveStatus === "on" ? "on" : "24%"}</b><span class="muted">Online</span></div>
+            <div class="metric-hit" data-metric="baixo"><b>${m.low}%</b><span class="muted">Peso baixo</span></div>
+            <div class="metric-hit" data-metric="direito"><b>${dir}%</b><span class="muted">Direito</span></div>
+            <div class="metric-hit" data-metric="port"><b>${port}%</b><span class="muted">Português</span></div>
+            <div class="metric-hit" data-metric="online"><b>${m.online}%</b><span class="muted">Online</span></div>
           </div>
         </div>
         <div class="card copilot">
@@ -1109,9 +1181,9 @@ const pages = {
         </div>
         <div class="card">
           <div class="muted">GRAU DE DISCIPLINAS</div>
-          <div class="disc-line"><span>Português</span><div class="bar cyan"><i style="width:${port == null ? 8 : Math.round(port * 100)}%"></i></div></div>
-          <div class="disc-line"><span>Direito</span><div class="bar blue"><i style="width:${dir || 8}%"></i></div></div>
-          <div class="disc-line"><span>Legislação</span><div class="bar violet"><i style="width:${leg == null ? 8 : Math.round(leg * 100)}%"></i></div></div>
+          <div class="disc-line metric-hit" data-metric="portbar"><span>Português</span><div class="bar cyan"><i style="width:${port}%"></i></div></div>
+          <div class="disc-line metric-hit" data-metric="dirbar"><span>Direito</span><div class="bar blue"><i style="width:${dir}%"></i></div></div>
+          <div class="disc-line metric-hit" data-metric="legbar"><span>Legislação</span><div class="bar violet"><i style="width:${leg}%"></i></div></div>
         </div>
         <div class="card">
           <div class="muted">COMANDO · SEMANA ${S.week}</div>
@@ -1563,10 +1635,13 @@ function rowDisc(d) {
 }
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeIaModal();
+  if (e.key === "Escape") { closeIaModal(); closeMetric(); }
 });
 document.addEventListener("click", (e) => {
   if (e.target.id === "iaClose" || e.target.id === "iaOverlay") { closeIaModal(); return; }
+  if (e.target.id === "metricClose" || e.target.id === "metricOverlay") { closeMetric(); return; }
+  const metric = e.target.closest && e.target.closest("[data-metric]");
+  if (metric && page === "comando") { openMetric(metric.dataset.metric); return; }
   if (!e.target.closest(".side-tools")) {
     const pop = $("zoomPop");
     if (pop) pop.hidden = true;
