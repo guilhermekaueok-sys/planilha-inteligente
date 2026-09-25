@@ -1043,6 +1043,20 @@ function arranjarOcr(text) {
     return m;
   });
 }
+function recortarCarimbo(canvas, largura, altura, caixa) {
+  if (window.PISemRecorte || /sem-recorte/.test(String(location.search || ""))) return canvas;
+  const c = caixa || window.PIRecorte || {};
+  const x0 = c.x0 == null ? 480 : c.x0;
+  const top = c.top == null ? 0 : c.top;
+  const x1 = c.x1 == null ? largura : c.x1;
+  const bottom = c.bottom == null ? 80 : c.bottom;
+  const sx = canvas.width / largura;
+  const sy = canvas.height / altura;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x0 * sx, top * sy, Math.max(0, x1 - x0) * sx, Math.max(0, bottom - top) * sy);
+  return canvas;
+}
 async function ocrPdf(doc) {
   const Tesseract = await loadTesseract();
   const worker = await Tesseract.createWorker("por", 1, {
@@ -1060,6 +1074,8 @@ async function ocrPdf(doc) {
       base.width = Math.floor(viewport.width);
       base.height = Math.floor(viewport.height);
       await page.render({ canvasContext: base.getContext("2d"), viewport }).promise;
+      const pt = page.getViewport({ scale: 1 });
+      recortarCarimbo(base, pt.width, pt.height);
       const imgs = [
         limparCarimbo(copiarCanvas(base), "max"),
         limparCarimbo(copiarCanvas(base), "binario"),
