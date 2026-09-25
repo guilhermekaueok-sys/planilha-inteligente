@@ -1385,7 +1385,8 @@ const pages = {
   edital() {
     const saved = S.editalLido || null;
     const topics = Array.isArray(S.userTopics) ? S.userTopics : [];
-    const fields = saved ? ["cargo", "prova", "banca", "inscricao", "taxa"].map((k) => `<p><strong>${k}.</strong> ${iaText(saved[k] || "—")}</p>`).join("") : `<p>Nenhum edital. A planilha está em branco. Anexe um arquivo para começar do zero.</p>`;
+    const labels = [["cargo", "Cargo"], ["prova", "Data da prova"], ["banca", "Banca"], ["inscricao", "Inscrição"], ["taxa", "Taxa"]];
+    const fields = saved ? labels.map(([k, lab]) => `<p><strong>${lab}.</strong> ${iaText(saved[k] || "—")}</p>`).join("") : `<p>Nenhum edital. A planilha está em branco. Anexe um arquivo para começar do zero.</p>`;
     const groups = {};
     topics.forEach((t) => {
       const name = t.disc || "Assunto";
@@ -1393,9 +1394,7 @@ const pages = {
       if (t.t) groups[name].push(t.t);
     });
     const names = Object.keys(groups);
-    const list = S.editalLendo
-      ? `<p class="muted">As IAs estão lendo o edital.</p>`
-      : names.length
+    const list = names.length
         ? names.map((name) => `<div class="topic"><strong>${iaText(name)}</strong><p>${groups[name].map((x) => iaText(x)).join("<br>")}</p></div>`).join("")
         : `<p class="muted">${iaText(S.editalAviso || "O verticalizado aparece aqui depois que você anexar o edital novo.")}</p>`;
     return `
@@ -2252,23 +2251,11 @@ document.addEventListener("change", (e) => {
     const file = e.target.files[0];
     const reader = new FileReader();
     const finish = (text) => {
-      if (!text || String(text).length < 40) return;
-      S.editalLendo = true;
-      S.editalAviso = "";
-      S.userTopics = [];
-      S.editalDiscs = [];
-      S.editalLido = { cargo: "", prova: "", banca: "", inscricao: "", taxa: "" };
       page = "edital";
+      const res = window.PIComando ? PIComando.ler(text) : { ok: false, motivo: "Leitor ausente." };
+      if (!res.ok) S.editalAviso = res.motivo;
+      save(S);
       render({ force: true });
-      const done = (parsed) => {
-        S.editalLendo = false;
-        applyParsedEdital(parsed || { meta: { aviso: "As IAs não fecharam o resumo. Confira a chave e anexe de novo." }, discs: [], topics: [] });
-        save(S);
-        page = "edital";
-        render({ force: true });
-      };
-      if (window.ATLAS && ATLAS.lerEdital) ATLAS.lerEdital(text).then(done).catch(() => done(null));
-      else done(null);
     };
     reader.onload = () => {
       if (/\.pdf$/i.test(file.name)) {
