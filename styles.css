@@ -27,11 +27,31 @@ body {
   position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%;
   pointer-events: none; display: block;
 }
-body::before { content: none; }
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    url("./orbe-still.webp?v=1"),
+    radial-gradient(1px 1px at 7% 18%, rgba(255,255,255,.62) 46%, transparent 48%),
+    radial-gradient(1px 1px at 18% 9%, rgba(198,220,255,.38) 46%, transparent 48%),
+    radial-gradient(1.3px 1.3px at 74% 12%, rgba(255,255,255,.5) 46%, transparent 48%),
+    radial-gradient(1px 1px at 90% 27%, rgba(186,210,240,.4) 46%, transparent 48%),
+    radial-gradient(1px 1px at 95% 58%, rgba(255,255,255,.32) 46%, transparent 48%),
+    radial-gradient(1.2px 1.2px at 12% 72%, rgba(210,228,255,.36) 46%, transparent 48%),
+    radial-gradient(1px 1px at 3% 46%, rgba(255,255,255,.34) 46%, transparent 48%),
+    radial-gradient(1px 1px at 28% 94%, rgba(180,205,235,.28) 46%, transparent 48%),
+    radial-gradient(1px 1px at 66% 90%, rgba(255,255,255,.28) 46%, transparent 48%),
+    radial-gradient(1.2px 1.2px at 86% 80%, rgba(220,235,255,.36) 46%, transparent 48%),
+    radial-gradient(1px 1px at 46% 5%, rgba(255,255,255,.26) 46%, transparent 48%),
+    radial-gradient(1px 1px at 54% 97%, rgba(190,215,255,.24) 46%, transparent 48%),
+    radial-gradient(ellipse 110% 80% at 50% 44%, rgba(22,46,92,.22), transparent 66%);
+  background-repeat: no-repeat;
+  background-position: center 42%;
+  background-size: min(1240px, 136vmin), auto, auto, auto, auto, auto, auto, auto, auto, auto, auto, auto, auto, auto;
+}
 html.no-gpu body::before {
   content: "";
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background: #050814 url("./orbe-poster.jpg?v=2") center center / contain no-repeat;
 }
 body::after {
   content: "";
