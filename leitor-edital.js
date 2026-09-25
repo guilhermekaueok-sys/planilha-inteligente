@@ -119,9 +119,10 @@
     return "";
   }
   function detectarProva(texto) {
-    var m = texto.match(/(?:data(?:\s+prevista)?\s+(?:da|de)\s+(?:aplica[cç][aã]o|realiza[cç][aã]o)(?:\s+da(?:s)?\s+prova(?:s)?)?|prova objetiva|realiza[cç][aã]o da prova)[\s\S]{0,80}?(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+    var linhas = String(texto || "").split(/\n/).filter(function (l) { return /prova|aplica[cç]/i.test(l) && !/inscri/i.test(l); });
+    var m = linhas.join("\n").match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
     if (m) return m[1];
-    var porExtenso = texto.match(/(?:prova|aplica[cç][aã]o)[\s\S]{0,60}?(\d{1,2})\s+de\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(\d{4})/i);
+    var porExtenso = String(texto || "").match(/(?:prova|aplica[cç][aã]o)[\s\S]{0,40}?(\d{1,2})\s+de\s+(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+(\d{4})/i);
     if (!porExtenso) return "";
     var meses = { janeiro: "01", fevereiro: "02", marco: "03", março: "03", abril: "04", maio: "05", junho: "06", julho: "07", agosto: "08", setembro: "09", outubro: "10", novembro: "11", dezembro: "12" };
     var mes = meses[porExtenso[2].toLowerCase()] || "";

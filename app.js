@@ -1003,6 +1003,41 @@ function loadTesseract() {
     document.head.appendChild(s);
   });
 }
+function limparCarimbo(canvas, modo) {
+  const ctx = canvas.getContext("2d");
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    const vermelho = r > g + 28 && r > b + 18;
+    const azul = b > r + 22 && b > g + 12;
+    let v = y;
+    if ((vermelho || azul) && y > 150) v = 255;
+    else v = Math.max(0, Math.min(255, (y - 128) * 1.45 + 128));
+    if (modo === "impresso") v = v > 168 ? 255 : 0;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+function copiarCanvas(src) {
+  const c = document.createElement("canvas");
+  c.width = src.width;
+  c.height = src.height;
+  c.getContext("2d").drawImage(src, 0, 0);
+  return c;
+}
+function arranjarOcr(text) {
+  return String(text || "").replace(/(?:[0-9OoIl|]{1,2}[./\-\s]+){2}[0-9OoIl|]{2,4}/g, (m) => {
+    const digits = m.replace(/[Oo]/g, "0").replace(/[Il|]/g, "1").replace(/[^\d]/g, "");
+    if (digits.length === 8) return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+    if (digits.length === 6) return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/20" + digits.slice(4);
+    return m;
+  });
+}
 async function ocrPdf(doc) {
   const Tesseract = await loadTesseract();
   const worker = await Tesseract.createWorker("por", 1, {
@@ -1015,13 +1050,25 @@ async function ocrPdf(doc) {
   try {
     for (let i = 1; i <= n; i++) {
       const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 1.8 });
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-      const res = await worker.recognize(canvas);
-      out += (res && res.data && res.data.text ? res.data.text : "") + "\n";
+      const viewport = page.getViewport({ scale: 2 });
+      const base = document.createElement("canvas");
+      base.width = Math.floor(viewport.width);
+      base.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: base.getContext("2d"), viewport }).promise;
+      const impresso = limparCarimbo(copiarCanvas(base), "impresso");
+      await worker.setParameters({ tessedit_pageseg_mode: "6" });
+      const a = await worker.recognize(impresso);
+      let pageText = a && a.data && a.data.text ? a.data.text : "";
+      const datas = pageText.match(/\d{2}\/\d{2}\/\d{4}/g) || [];
+      if (datas.length < 2) {
+        const manuscrito = limparCarimbo(copiarCanvas(base), "manuscrito");
+        await worker.setParameters({ tessedit_pageseg_mode: "11" });
+        const b = await worker.recognize(manuscrito);
+        const extra = b && b.data && b.data.text ? b.data.text : "";
+        const nota = (t) => ((t.match(/\d{2}\/\d{2}\/\d{4}/g) || []).length * 3) + ((t.match(/R\$\s*[\d.]+,00/g) || []).length);
+        pageText = nota(extra) > nota(pageText) ? extra : pageText;
+      }
+      out += arranjarOcr(pageText) + "\n";
     }
   } finally {
     await worker.terminate();
