@@ -31,7 +31,7 @@ body::before { content: none; }
 html.no-gpu body::before {
   content: "";
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background: #050814 url("./fundo-orbe.jpg") center center / cover no-repeat;
+  background: #050814 url("./orbe-poster.jpg") center center / contain no-repeat;
 }
 body::after {
   content: "";
