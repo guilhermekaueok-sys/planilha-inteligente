@@ -61,7 +61,10 @@ Outra chave é ignorada. Outro comando não muda nada.
         id: id,
         sigla: typeof discSigla === "function" ? discSigla(nome) : nome.slice(0, 4).toUpperCase(),
         name: nome,
-        pesoOf: 1, pts: 1, q: 0, editais: 1, provas: 1, n: 1,
+        pesoOf: 1,
+        pts: Number(d && d.pts) > 0 ? Number(d.pts) : 1,
+        q: Number(d && d.q) > 0 ? Number(d.q) : 0,
+        editais: 1, provas: 1, n: 1,
       });
       (Array.isArray(d.assuntos) ? d.assuntos : []).forEach(function (a) {
         var topic = clean(a, 180);
@@ -75,11 +78,64 @@ Outra chave é ignorada. Outro comando não muda nada.
     return { ok: true, motivo: "", cargo: meta.cargo, disciplinas: discs.length, assuntos: topics.length };
   }
 
+  function extrairQuadroProva(text) {
+    var lines = String(text || "").replace(/\r/g, "").split("\n").map(function (l) {
+      return l.replace(/\s+/g, " ").trim();
+    }).filter(Boolean);
+    var prosa = /ser[aá]|consistir|subitem|candidat|aprovad|elabora|corrigid|percent|defici|concorr[eê]ncia|m[ií]nimo de|acertos no|car[aá]ter|somente|caso o|total\b|ampla |da prova|remanejament|classificad/i;
+    var nova = /^(l[ií]ngua|racioc[ií]nio|hist[oó]ria|geografia|no[cç][oõ]es|legisla[cç][aã]o|estatuto|est\s*atuto|lei\s|direito|inform[aá]tica|matem[aá]tica|portugu|atualidades|conhecimentos)/i;
+    var fim = /^(total\b|da prova|ampla concorr|prova discursiva|somente ser|caso o n)/i;
+    var start = -1;
+    for (var i = 0; i < lines.length; i++) {
+      if (/l[ií]ngua portuguesa\s+\d+/i.test(lines[i]) || /racioc[ií]nio l[oó]gico\s+\d+/i.test(lines[i])) {
+        start = i;
+        break;
+      }
+    }
+    if (start < 0) return null;
+    var discs = [];
+    var pend = "";
+    function limpa(nome) {
+      return nome.replace(/\s+/g, " ").replace(/^est\s+atuto/i, "Estatuto").replace(/\s+administrativo$/i, "").trim();
+    }
+    function fecha(nome, q, pts) {
+      nome = limpa(nome);
+      if (nome.length < 4 || prosa.test(nome)) return;
+      if (/^administrativo$/i.test(nome)) nome = "Direito Administrativo";
+      discs.push({ nome: nome, q: q || 0, pts: pts || 0, assuntos: [] });
+    }
+    for (var j = start; j < lines.length; j++) {
+      var line = lines[j];
+      if (fim.test(line) || prosa.test(line)) break;
+      if (/^aprova[cç][aã]o$/i.test(line)) continue;
+      var m = line.match(/^(.+?)\s+(\d{1,3})(?:\s+(\d{1,3}))?$/);
+      if (m && /[A-Za-zÀ-ú]{3}/.test(m[1]) && Number(m[2]) <= 200 && (!m[3] || Number(m[3]) >= Number(m[2]))) {
+        var nome = (pend ? pend + " " : "") + m[1];
+        pend = "";
+        fecha(nome, Number(m[2]), m[3] ? Number(m[3]) : 0);
+        continue;
+      }
+      if (line.length > 42 || /[.]/.test(line)) break;
+      if (nova.test(line) || /^administrativo$/i.test(line)) {
+        if (pend) fecha(pend, 0, 0);
+        pend = line;
+        continue;
+      }
+      pend = pend ? pend + " " + line : line;
+    }
+    if (pend) fecha(pend, 0, 0);
+    return discs.length >= 3 ? discs : null;
+  }
+
   function ler(text) {
     if (!text || String(text).length < 40) return { ok: false, motivo: "O arquivo não trouxe texto para o leitor." };
-    if (typeof parseEdital === "function") return aplicar(parseEdital(text));
-    if (typeof parseEditalText !== "function") return { ok: false, motivo: "Leitor ausente." };
-    return aplicar(packDe(parseEditalText(text)));
+    if (typeof parseEdital !== "function" && typeof parseEditalText !== "function") {
+      return { ok: false, motivo: "Leitor ausente." };
+    }
+    var bruto = typeof parseEdital === "function" ? parseEdital(text) : packDe(parseEditalText(text));
+    var quadro = extrairQuadroProva(text);
+    if (quadro) bruto.disciplinas = quadro;
+    return aplicar(bruto);
   }
 
   window.PIComando = { aplicar: aplicar, ler: ler };
