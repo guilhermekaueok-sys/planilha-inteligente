@@ -292,7 +292,13 @@ function joinRoom(code) {
   S.room = String(code || "").trim();
   save(S, true);
   if (!S.room) return;
-  if (typeof Peer === "undefined") { liveStatus = "sem-peer"; return; }
+  if (typeof Peer === "undefined") {
+    if (window.PI_PEER) {
+      liveStatus = "ligando";
+      PI_PEER().then(function () { joinRoom(S.room); }).catch(function () { liveStatus = "sem-peer"; });
+    } else liveStatus = "sem-peer";
+    return;
+  }
   try { if (peer) peer.destroy(); } catch (_) {}
   live.length = 0;
   const key = roomKey(S.room);

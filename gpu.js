@@ -30,7 +30,8 @@
     "float side=min(uRes.x,uRes.y)*1.42;",
     "vec2 tuv=p*(uRes/side)+0.5;",
     "if(tuv.x<0.0||tuv.y<0.0||tuv.x>1.0||tuv.y>1.0){gl_FragColor=vec4(navy,1.0);return;}",
-    "vec3 c=mix(texture2D(uPrev,tuv).rgb,texture2D(uTex,tuv).rgb,clamp(uMix,0.0,1.0));",
+    "float k=clamp(uMix,0.0,1.0);k=k*k*(3.0-2.0*k);",
+    "vec3 c=mix(texture2D(uPrev,tuv).rgb,texture2D(uTex,tuv).rgb,k);",
     "float lum=max(c.r,max(c.g,c.b));",
     "gl_FragColor=vec4(mix(navy,c,smoothstep(0.003,0.018,lum)),1.0);",
     "}",
@@ -87,18 +88,26 @@
   var mixAt = 1;
   var mixFrom = 0;
   var HOLD = (7 / 24) * 1000;
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
   function upload(tex, source) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    var w = source.videoWidth || source.naturalWidth || 0;
+    if (w && tex._w === w) {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    } else {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      if (w) tex._w = w;
+    }
   }
   var poster = new Image();
+  poster.decoding = "async";
   poster.onload = function () {
     upload(texPrev, poster);
     upload(texCur, poster);
     mixAt = 1;
+    poke();
   };
-  poster.src = "./orbe-poster.jpg";
+  poster.src = "./orbe-poster.jpg?v=2";
   var vid = document.createElement("video");
   vid.muted = true;
   vid.defaultMuted = true;
@@ -106,19 +115,27 @@
   vid.playsInline = true;
   vid.setAttribute("playsinline", "");
   vid.setAttribute("webkit-playsinline", "");
-  vid.preload = "auto";
+  vid.preload = "none";
   vid.setAttribute("aria-hidden", "true");
   vid.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none";
   document.body.appendChild(vid);
-  vid.src = "./orbe-loop.mp4?v=2";
   function tune() {
-    try { vid.playbackRate = 1 / 7; } catch (_) {}
+    try {
+      vid.defaultPlaybackRate = 1 / 7;
+      vid.playbackRate = 1 / 7;
+    } catch (_) {}
   }
   function arm() {
     tune();
-    if (reduced) return;
+    if (reduced || !vid.src) return;
     var p = vid.play();
     if (p && p.catch) p.catch(function () {});
+  }
+  function startVideo() {
+    if (vid.getAttribute("src")) return;
+    vid.preload = "auto";
+    vid.src = "./orbe-loop.mp4?v=3";
+    tune();
   }
   vid.addEventListener("loadedmetadata", tune);
   vid.addEventListener("canplay", arm);
@@ -129,6 +146,7 @@
   var lastDraw = 0;
   var lastT = -1;
   var running = true;
+  var raf = 0;
   function resize() {
     var w = Math.max(1, Math.floor(window.innerWidth * dpr));
     var h = Math.max(1, Math.floor(window.innerHeight * dpr));
@@ -138,11 +156,14 @@
     }
     gl.viewport(0, 0, canvas.width, canvas.height);
     canvas.dataset.tier = String(Math.round(dpr * 100));
+    poke();
+  }
+  function poke() {
+    if (!raf && running) raf = requestAnimationFrame(draw);
   }
   function draw(now) {
+    raf = 0;
     if (!running) return;
-    if (!reduced) requestAnimationFrame(draw);
-    if (!reduced && now - lastDraw < 32) return;
     var gap = lastDraw ? now - lastDraw : 32;
     lastDraw = now;
     if (gap > 48) slow += 1;
@@ -153,6 +174,7 @@
       resize();
     }
     var t0 = performance.now();
+    var moved = false;
     if (vid.readyState >= 2 && vid.videoWidth && Math.abs(vid.currentTime - lastT) > 0.02) {
       var swap = texPrev;
       texPrev = texCur;
@@ -161,6 +183,7 @@
       lastT = vid.currentTime;
       mixFrom = now;
       mixAt = 0;
+      moved = true;
     }
     var m = mixAt >= 1 ? 1 : Math.min(1, (now - mixFrom) / HOLD);
     mixAt = m;
@@ -175,14 +198,35 @@
       dpr = Math.max(0.65, dpr * 0.8);
       resize();
     }
+    if (!reduced && (m < 1 || moved)) raf = requestAnimationFrame(draw);
+  }
+  var watching = false;
+  function watch() {
+    if (watching) return;
+    if (!vid.requestVideoFrameCallback) {
+      vid.addEventListener("timeupdate", poke);
+      watching = true;
+      return;
+    }
+    watching = true;
+    vid.requestVideoFrameCallback(function frame() {
+      if (!running || reduced) {
+        watching = false;
+        return;
+      }
+      poke();
+      vid.requestVideoFrameCallback(frame);
+    });
   }
   resize();
   canvas.dataset.gpu = "webgl";
-  requestAnimationFrame(draw);
+  watch();
   window.addEventListener("resize", resize);
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       try { vid.pause(); } catch (_) {}
       return;
     }
@@ -191,8 +235,14 @@
       lastDraw = 0;
       if (!reduced) {
         arm();
-        requestAnimationFrame(draw);
+        watch();
+        poke();
       }
     }
   });
+  if (!reduced) {
+    var boot = function () { startVideo(); };
+    if (window.requestIdleCallback) requestIdleCallback(boot, { timeout: 900 });
+    else setTimeout(boot, 280);
+  }
 })();
