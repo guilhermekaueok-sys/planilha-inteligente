@@ -181,6 +181,29 @@
         S.topic = S.topic || {};
         S.topic[a.id] = a.st || "andamento";
         notes.push("tópico");
+      } else if (a.op === "topicadd") {
+        var title = String(a.t || "").slice(0, 140);
+        if (!title) return;
+        S.userTopics = Array.isArray(S.userTopics) ? S.userTopics : [];
+        S.userTopics.push({ id: "u" + Date.now(), disc: String(a.disc || "").slice(0, 60), t: title });
+        notes.push("assunto " + title);
+      } else if (a.op === "drop") {
+        var dayD = resolveDayToken(String(a.day || ""));
+        var idD = resolveDiscToken(String(a.disc || ""));
+        if (!dayD || !idD || typeof cicloOfDay !== "function") return;
+        var cidD = cicloOfDay(dayD);
+        ensurePlan();
+        (S.board[0].slots || []).forEach(function (slot) {
+          var cell = slot[cidD] || {};
+          if (cell.disc === idD) slot[cidD] = { disc: "", horas: "", ques: "", nota: "", feito: "" };
+        });
+        notes.push("removido");
+      } else if (a.op === "edital") {
+        var field = { cargo: "cargo", banca: "banca", prova: "prova", taxa: "taxa", inscricao: "inscricao" }[String(a.field || "")];
+        if (!field) return;
+        S.editalLido = S.editalLido || {};
+        S.editalLido[field] = String(a.value || "").slice(0, 160);
+        notes.push(field);
       }
     });
     return notes;
@@ -235,6 +258,12 @@
     if (q) return { k: "ops", actions: [{ op: "log", n: q[1], disc: q[2], hits: q[3] || 0 }], write: true };
     if (/verticaliz/.test(t) || (/edital/.test(t) && /resum|analis|estrateg|cargo|banca|taxa/.test(t)) || t === "edital") return { k: "edital" };
     if (/^simpatia|^interacao|^criatividade|^poder/.test(t)) return { k: "pref", raw: t, write: true };
+    var edField = t.match(/^(?:edital\s+)?(cargo|banca|prova|taxa|inscricao)\s+(?:e|eh|:)?\s+(.{3,160})$/);
+    if (edField && /edital|cargo|banca|taxa|inscri|prova/.test(t)) return { k: "ops", actions: [{ op: "edital", field: edField[1], value: edField[2] }], write: true };
+    var addTopic = t.match(/(?:adicione|inclua|coloque)\s+(?:o\s+)?(?:assunto|topico)\s+(.+?)(?:\s+em\s+([a-z0-9].*))?$/);
+    if (addTopic) return { k: "ops", actions: [{ op: "topicadd", t: addTopic[1], disc: addTopic[2] || "" }], write: true };
+    var drop = t.match(/(?:remova|retire|tire|apague)\s+(.+?)\s+(?:da|de|do|na|no)\s+([a-z0-9]+)$/);
+    if (drop) return { k: "ops", actions: [{ op: "drop", disc: drop[1], day: drop[2] }], write: true };
     return null;
   }
   function exec(raw) {
@@ -469,6 +498,40 @@
       return { say: ok[best].text, precision: precision, votes: ok.map(function (r) { return r.name; }) };
     });
   }
+  function safeOps(list) {
+    var allow = { hours: 1, done: 1, log: 1, sim: 1, nota: 1, week: 1, topic: 1, topicadd: 1, drop: 1, edital: 1 };
+    return (Array.isArray(list) ? list : []).filter(function (a) { return a && allow[a.op]; }).slice(0, 6);
+  }
+  function act(raw) {
+    var local = exec(raw);
+    var p = prefs();
+    var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
+    var models = [
+      { id: "chatgpt", which: "openai", key: p.chatgpt || p.openai },
+      { id: "claude", which: "claude", key: p.claude },
+      { id: "gemini", which: "gemini", key: p.gemini },
+      { id: "copilot", which: "copilot", key: p.copilot },
+    ].filter(function (m) { return on[m.id] !== false && m.key; });
+    if (!models.length) {
+      return Promise.resolve({ say: local || "Diga a matéria, o dia e o número. Sem chave, eu executo o pedido direto nos dados de estudo.", precision: local ? 100 : 0, votes: [] });
+    }
+    var prompt = "Devolva só JSON {\"say\":\"frase curta\",\"actions\":[{\"op\":\"hours|done|log|sim|nota|week|topic|topicadd|drop|edital\"}]}. Só dados de estudo. Proibido código, arquivo ou regra do sistema. Sem mudança, actions vazio. Pedido: " + raw;
+    return Promise.all(models.map(function (m) {
+      return askModel(m.which, m.key, prompt).then(function (text) {
+        return { name: m.id, text: String(text || "") };
+      }).catch(function () { return { name: m.id, text: "" }; });
+    })).then(function (rows) {
+      var plans = [];
+      rows.forEach(function (r) {
+        var plan = parsePlan(r.text);
+        if (plan) plans.push({ name: r.name, plan: plan });
+      });
+      if (!local && plans[0]) applyOps(safeOps(plans[0].plan.actions));
+      var say = local || (plans[0] && plans[0].plan.say) || "Não fechei esse pedido. Diga a disciplina, o dia e o número.";
+      var precision = plans.length ? (plans.length === 1 ? 100 : Math.round(100 * plans.filter(function (x) { return (x.plan.say || "") === (plans[0].plan.say || ""); }).length / plans.length)) : (local ? 100 : 0);
+      return { say: say, precision: precision, votes: plans.map(function (x) { return x.name; }) };
+    });
+  }
   function council(raw) {
     var p = prefs();
     var gem = String(p.gemini || "").trim();
@@ -504,6 +567,7 @@
     listen: listen,
     prime: prime,
     askAll: askAll,
+    act: act,
     council: council,
     setLevel: setLevel,
     levelLine: levelLine,

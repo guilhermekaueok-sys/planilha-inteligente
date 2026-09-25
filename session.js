@@ -161,7 +161,7 @@
       const priv = (typeof S !== "undefined" && S && S.atlasLog) ? S.atlasLog : [];
       const list = this.messages.slice(-30).concat(priv).sort((a, b) => (a.ts || 0) - (b.ts || 0)).slice(-40);
       const sig = list.length
-        ? list.map((m) => (m.id || "") + "|" + (m.ts || "") + "|" + (m.text || "") + "|" + (m.priv ? "p" : "")).join("\n")
+        ? list.map((m) => (m.id || "") + "|" + (m.ts || "") + "|" + (m.text || "") + "|" + (m.priv ? "p" : "") + "|" + (m.sent ? "s" : "") + (m.delivered ? "d" : "")).join("\n")
         : "empty";
       if (log.dataset.sig === sig) return;
       log.dataset.sig = sig;
@@ -174,26 +174,44 @@
           const who = m.priv && m.uid !== "atlas" ? "só você" : (m.name || "aluno");
           const audio = m.audio && String(m.audio).indexOf("data:audio/") === 0
             ? `<audio controls src="${esc(m.audio)}"></audio>` : "";
-          return `<div class="dock-msg ${mine ? "me" : "them"}${m.priv ? " private" : ""}"><span class="who">${esc(who)}</span>${esc(m.text || "")}${audio}</div>`;
+          const when = new Date(m.ts || Date.now());
+          const hh = ("0" + when.getHours()).slice(-2) + ":" + ("0" + when.getMinutes()).slice(-2);
+          const ticks = !mine || m.priv ? "" : (m.delivered ? "<i class=\"ticks ok\">✓✓</i>" : (m.sent ? "<i class=\"ticks\">✓</i>" : ""));
+          return `<div class="dock-msg ${mine ? "me" : "them"}${m.priv ? " private" : ""}"><span class="who">${esc(who)}</span>${esc(m.text || "")}${audio}<span class="dock-foot">${hh}${ticks}</span></div>`;
         }).join("");
       }
       log.scrollTop = log.scrollHeight;
     },
     push(msg, broadcast) {
-      if (broadcast) msg.pending = true;
+      if (broadcast) { msg.pending = true; msg.sent = false; msg.delivered = false; }
       this.messages = roomSave(this.messages.concat(msg));
       if (broadcast && bus) bus.postMessage({ type: "chat", msg: msg });
+      const paintNow = () => {
+        const log = document.getElementById("dockLog");
+        if (log) { log.dataset.sig = ""; this.paint(log); }
+      };
+      const lift = () => {
+        const now = Date.now();
+        const others = readPresence().some((p) => p.id !== (S && S.me && S.me.id) && now - (p.ts || 0) < 12000);
+        this.messages.forEach((m) => {
+          if (m.uid === (S && S.me && S.me.id) && m.sent && others) m.delivered = true;
+        });
+        paintNow();
+      };
       if (broadcast && fb && S && S.entered) {
         fb.db.collection("room").add({
           uid: msg.uid, name: msg.name, text: msg.text || "", ts: msg.ts,
-        }).catch(() => {});
+        }).then(() => { msg.sent = true; msg.pending = false; lift(); }).catch(() => {});
         if (msg.audio && fb.storage) {
           const ref = fb.storage.ref().child("room/" + msg.uid + "/" + msg.ts + ".webm");
           ref.putString(msg.audio, "data_url").catch(() => {});
         }
+      } else if (broadcast) {
+        msg.sent = true;
+        msg.pending = false;
+        lift();
       }
-      const log = document.getElementById("dockLog");
-      if (log) this.paint(log);
+      paintNow();
     },
     postText(text) {
       if (!S || !S.me) return;
@@ -246,6 +264,13 @@
         if (now - (d.ts || 0) < 12000) list.push({ id: doc.id, name: d.name || "aluno", ts: d.ts });
       });
       paintPresence(list);
+      const me = S && S.me && S.me.id;
+      const others = list.some((p) => p.id !== me);
+      if (others) {
+        PIRoom.messages.forEach((m) => { if (m.uid === me && m.sent) m.delivered = true; });
+        const log = document.getElementById("dockLog");
+        if (log) { log.dataset.sig = ""; PIRoom.paint(log); }
+      }
     }, () => {});
     fb.db.collection("room").orderBy("ts").limitToLast(40).onSnapshot((snap) => {
       const next = [];
@@ -253,7 +278,15 @@
         const d = doc.data() || {};
         next.push({ id: doc.id, uid: d.uid, name: d.name, text: d.text || "", ts: d.ts || 0 });
       });
-      const pending = (PIRoom.messages || []).filter((m) => m.pending && !next.some((n) => n.uid === m.uid && n.text === m.text && Math.abs((n.ts || 0) - (m.ts || 0)) < 15000));
+      const prev = PIRoom.messages || [];
+      const me = S && S.me && S.me.id;
+      next.forEach((n) => {
+        const old = prev.find((m) => m.uid === n.uid && m.text === n.text && Math.abs((m.ts || 0) - (n.ts || 0)) < 15000);
+        n.sent = true;
+        n.delivered = !!(old && old.delivered);
+        if (n.uid === me && readPresence().some((p) => p.id !== me && Date.now() - (p.ts || 0) < 12000)) n.delivered = true;
+      });
+      const pending = prev.filter((m) => m.pending && !next.some((n) => n.uid === m.uid && n.text === m.text && Math.abs((n.ts || 0) - (m.ts || 0)) < 15000));
       PIRoom.messages = next.concat(pending).sort((a, b) => (a.ts || 0) - (b.ts || 0)).slice(-40);
       const log = document.getElementById("dockLog");
       if (log) PIRoom.paint(log);

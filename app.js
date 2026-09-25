@@ -837,7 +837,7 @@ function deliverAtlas(text, reply, ts, opt) {
   S.chats[pal] = S.chats[pal] || [];
   S.atlasLog = S.atlasLog || [];
   S.atlasLog.push({ id: "a" + ts, uid: S.me.id, name: S.me.name || "você", text: text, ts: ts, priv: true });
-  S.atlasLog.push({ id: "a" + (ts + 1), uid: "atlas", name: "ATLAS", text: reply, ts: ts + 1, priv: true });
+  S.atlasLog.push({ id: "a" + (ts + 1), uid: "atlas", name: "IAs", text: reply, ts: ts + 1, priv: true });
   if (S.atlasLog.length > 40) S.atlasLog = S.atlasLog.slice(-40);
   S.chats[pal].push({ from: "me", text: text, ts: ts, priv: true });
   S.chats[pal].push({ from: "atlas", text: reply, ts: ts + 1, priv: true });
@@ -852,16 +852,16 @@ function sendPlanChat(inp, opt) {
   const text = inp.value.trim();
   const ts = Date.now();
   inp.value = "";
-  const direct = !!(opt && opt.voice) || /^\s*atlas\b/i.test(text);
+  const direct = !!(opt && opt.voice) || /^\s*(atlas|ias|pergunte|gemini|claude|copilot)\b/i.test(text);
   if (window.ATLAS) ATLAS._direct = direct;
   const reply = applyChatPlan(text);
   if (reply) {
     deliverAtlas(text, reply, ts, opt);
     return;
   }
-  if (direct && window.ATLAS && ATLAS.council) {
-    ATLAS.council(text).then((line) => {
-      deliverAtlas(text, line || "Não fechei esse pedido. Diga a disciplina, o dia e o número.", ts + 2, opt);
+  if (direct && window.ATLAS && ATLAS.act) {
+    ATLAS.act(text).then((pack) => {
+      deliverAtlas(text, (pack && pack.say) || "Não fechei esse pedido. Diga a disciplina, o dia e o número.", ts + 2, opt);
     });
     return;
   }
@@ -1072,7 +1072,8 @@ const pages = {
         <div class="card copilot">
           <div class="atlas-orb" aria-hidden="true"></div>
           <p class="copilot-lead">Comando fica só com você. A turma não vê.</p>
-          <h2>ATLAS</h2>
+          <h2 class="ask-title">Pergunte às IAs</h2>
+          <p class="ask-sub">Assistentes integrados: ChatGPT, Claude, Gemini e Copilot.</p>
           <div class="wave">${"<i></i>".repeat(18)}</div>
           <button class="voice-btn" id="voiceAsk" type="button">
             <strong>${userName() || "Seu nome"}</strong>
@@ -1400,9 +1401,9 @@ const pages = {
     const last = S.iaLast || null;
     const models = [["chatgpt", "ChatGPT"], ["claude", "Claude"], ["gemini", "Gemini"], ["copilot", "Copilot"]];
     return `
-      <p class="kicker">SALA DE IAs</p>
-      <h1>SALA DE IAs</h1>
-      <p class="sub">ChatGPT, Claude, Gemini e Copilot leem o mesmo pedido ao mesmo tempo. A resposta mostra o consenso.</p>
+      <p class="kicker">PERGUNTE ÀS IAs</p>
+      <h1>Pergunte às IAs</h1>
+      <p class="sub">Assistentes integrados: ChatGPT, Claude, Gemini e Copilot.</p>
       <div class="card">
         <div class="ia-row">
           ${models.map(([id, lab]) => `<button type="button" class="btn ${on[id] ? "" : "ghost"}" data-ia="${id}">${lab}</button>`).join("")}
@@ -1828,12 +1829,8 @@ document.addEventListener("click", (e) => {
     const text = inp && inp.value.trim();
     if (!text) return;
     inp.value = "";
-    const local = ATLAS.exec(text);
-    S.iaLast = { say: "Consultando as IAs…", precision: 0, votes: [] };
-    render({ force: true });
-    ATLAS.askAll(text).then((pack) => {
-      if (local) pack.say = local + (pack.say ? " " + pack.say : "");
-      S.iaLast = pack;
+    ATLAS.act(text).then((pack) => {
+      S.iaLast = pack || { say: "Não fechei esse pedido.", precision: 0, votes: [] };
       save(S);
       render({ force: true });
     });
