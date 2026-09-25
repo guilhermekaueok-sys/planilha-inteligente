@@ -421,6 +421,54 @@
       return j.text || "";
     });
   }
+  function wordSet(s) {
+    var o = {};
+    fold(s).split(/[^a-z0-9]+/).forEach(function (w) { if (w.length > 2) o[w] = 1; });
+    return o;
+  }
+  function alike(a, b) {
+    var A = wordSet(a);
+    var B = wordSet(b);
+    var ak = Object.keys(A);
+    var bk = Object.keys(B);
+    if (!ak.length || !bk.length) return 0;
+    var inter = ak.filter(function (k) { return B[k]; }).length;
+    var uni = ak.length;
+    bk.forEach(function (k) { if (!A[k]) uni += 1; });
+    return uni ? inter / uni : 0;
+  }
+  function askAll(raw) {
+    var p = prefs();
+    var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
+    var models = [
+      { id: "chatgpt", which: "openai", key: p.chatgpt || p.openai },
+      { id: "claude", which: "claude", key: p.claude },
+      { id: "gemini", which: "gemini", key: p.gemini },
+      { id: "copilot", which: "copilot", key: p.copilot },
+    ].filter(function (m) { return on[m.id] !== false && m.key; });
+    if (!models.length) {
+      return Promise.resolve({ say: "Nenhuma chave neste aparelho. Cole a chave da IA e deixe o botão aceso.", precision: 0, votes: [] });
+    }
+    var prompt = "Responda em português, curto e direto, para um concurseiro. Não invente dado que não esteja no pedido. Pedido: " + raw;
+    return Promise.all(models.map(function (m) {
+      return askModel(m.which, m.key, prompt).then(function (text) {
+        return { name: m.id, text: String(text || "").trim() };
+      }).catch(function () { return { name: m.id, text: "" }; });
+    })).then(function (rows) {
+      var ok = rows.filter(function (r) { return r.text; });
+      if (!ok.length) return { say: "As IAs não responderam. Confira a chave neste aparelho.", precision: 0, votes: rows.map(function (r) { return r.name; }) };
+      if (ok.length === 1) return { say: ok[0].text, precision: 100, votes: [ok[0].name] };
+      var scores = ok.map(function (r, i) {
+        var s = 0;
+        ok.forEach(function (o, j) { if (i !== j) s += alike(r.text, o.text); });
+        return s / (ok.length - 1);
+      });
+      var best = 0;
+      scores.forEach(function (s, i) { if (s > scores[best]) best = i; });
+      var precision = Math.round(scores.reduce(function (a, b) { return a + b; }, 0) / scores.length * 100);
+      return { say: ok[best].text, precision: precision, votes: ok.map(function (r) { return r.name; }) };
+    });
+  }
   function council(raw) {
     var p = prefs();
     var gem = String(p.gemini || "").trim();
@@ -455,6 +503,7 @@
     speak: speak,
     listen: listen,
     prime: prime,
+    askAll: askAll,
     council: council,
     setLevel: setLevel,
     levelLine: levelLine,

@@ -24,16 +24,43 @@ export default async function handler(req, res) {
       res.status(r.ok ? 200 : 502).json({ text: text, error: j.error || null });
       return;
     }
+    if (body.which === "claude") {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-haiku-latest",
+          max_tokens: 700,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const j = await r.json();
+      const text = Array.isArray(j.content) ? j.content.map((p) => p.text || "").join("") : "";
+      res.status(r.ok ? 200 : 502).json({ text: text, error: j.error || null });
+      return;
+    }
+    if (body.which === "copilot") {
+      const r = await fetch("https://api.githubcopilot.com/chat/completions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-4o", messages: [{ role: "user", content: prompt }] }),
+      });
+      const j = await r.json();
+      const text = j.choices && j.choices[0] && j.choices[0].message ? j.choices[0].message.content : "";
+      res.status(r.ok ? 200 : 502).json({ text: text, error: j.error || null });
+      return;
+    }
     const r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0.2,
-        messages: [
-          { role: "system", content: "Você revisa o plano do ATLAS. Devolva só JSON, sem markdown." },
-          { role: "user", content: prompt },
-        ],
+        messages: [{ role: "user", content: prompt }],
       }),
     });
     const j = await r.json();

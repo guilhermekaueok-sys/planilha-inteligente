@@ -1,4 +1,4 @@
-const KEY = "vigilia-gcm-v1";
+const KEY = "pi-sheet-v8";
 
 const DISC = [
   { id: "port", sigla: "Port", name: "Língua Portuguesa", bloco: "comuns", q: 18, pesoOf: 1, pts: 18, editais: 9, provas: 9, n: 9 },
@@ -47,15 +47,18 @@ const TOPICS = [
 const defaultState = () => ({
   week: 1,
   day: "seg",
-  planMode: "auto",
+  planMode: "manual",
   logs: {},
   topic: {},
+  userTopics: [],
+  simLogs: [],
+  editalLido: null,
   me: {
     id: "vg-" + Math.random().toString(36).slice(2, 8),
     name: "",
     handle: "",
-    city: "Natal / Nísia Floresta",
-    exam: "GCM Nísia Floresta · IDIB",
+    city: "",
+    exam: "",
     email: "",
   },
   friends: {},
@@ -73,9 +76,27 @@ const defaultState = () => ({
   sheet: null,
 });
 
+function blankStudy(s) {
+  if (!s || s.blanked === "v8") return s;
+  s.logs = {};
+  s.topic = {};
+  s.userTopics = [];
+  s.simLogs = [];
+  s.editalLido = null;
+  s.board = null;
+  s.sheet = null;
+  s.week = 1;
+  s.planMode = "manual";
+  s.atlasLog = [];
+  s.mestre = null;
+  s.masterUrl = "";
+  if (s.me) { s.me.exam = ""; s.me.city = ""; }
+  s.blanked = "v8";
+  return s;
+}
 function load() {
-  try { return { ...defaultState(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }; }
-  catch { return defaultState(); }
+  try { return blankStudy({ ...defaultState(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }); }
+  catch { return blankStudy(defaultState()); }
 }
 const bus = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("vigilia-gcm") : null;
 const live = [];
@@ -451,6 +472,11 @@ function ensurePlan() {
   if (!S.board || !S.board.length) S.board = emptyBoard();
 }
 function rotatePlan() {
+  if (!Array.isArray(S.userTopics) || !S.userTopics.length) {
+    S.board = emptyBoard();
+    save(S);
+    return;
+  }
   S.board = seedBoard();
   save(S);
 }
@@ -925,10 +951,10 @@ function render(opts) {
       b.classList.toggle("on", b.dataset.nav === page);
     });
     const whoami = $("whoami");
-    if (whoami) whoami.textContent = "Planilha Inteligente";
+    if (whoami) whoami.textContent = "A Planilha Inteligente";
     const photo = $("userPhoto");
     const chipName = $("userChipName");
-    if (photo) photo.src = (S.me && S.me.photo) || "./logo-pi.svg";
+    if (photo) photo.src = (S.me && S.me.photo) || "./logo-a.jpg";
     if (chipName) chipName.textContent = (S.me && S.me.name) || "Seu nome";
     const tn = $("topName");
     const te = $("topEmail");
@@ -982,7 +1008,7 @@ const pages = {
     const leg = rate("legmun");
     const peso = Math.round(importance(top) * 100);
     const edital = (() => {
-      const list = TOPICS || [];
+      const list = Array.isArray(S.userTopics) ? S.userTopics : [];
       if (!list.length) return { pct: 0, done: 0, n: 0 };
       const w = { dominado: 1, revisar: 0.75, andamento: 0.45, pendente: 0 };
       const sum = list.reduce((a, t) => a + (w[(S.topic && S.topic[t.id]) || "pendente"] || 0), 0);
@@ -995,7 +1021,7 @@ const pages = {
     return `
       <div class="hero-title">
         <h1>DESEMPENHO GERAL</h1>
-        <p class="muted">Overall Performance · Nísia 2026 · semana ${S.week}</p>
+        <p class="muted">Semana ${S.week}</p>
       </div>
       <div class="dash-hero">
         <div class="card ring-card">
@@ -1115,39 +1141,20 @@ const pages = {
     `;
   },
   edital() {
+    const saved = S.editalLido || null;
+    const topics = Array.isArray(S.userTopics) ? S.userTopics : [];
+    const fields = saved ? ["cargo", "prova", "banca", "inscricao", "taxa"].map((k) => `<p><strong>${k}.</strong> ${saved[k] || "—"}</p>`).join("") : `<p>Nenhum edital. A planilha está em branco. Anexe um arquivo para começar do zero.</p>`;
+    const list = topics.length ? topics.map((t) => `<div class="topic"><strong>${t.disc || "Assunto"}</strong><p>${t.t}</p></div>`).join("") : `<p class="muted">O verticalizado aparece aqui depois que você anexar o edital novo.</p>`;
     return `
-      ${cover("edital")}
       <p class="kicker">EDITAL</p>
       <h1>EDITAL</h1>
-      <div class="card">${window.ATLAS ? ATLAS.card() : ""}
-        <label class="muted" style="display:block;margin-top:8px">Anexar edital (PDF ou texto)
+      <div class="card">${fields}
+        <label class="muted" style="display:block;margin-top:8px">Anexar edital novo (PDF ou texto)
           <input id="editalFile" type="file" accept=".pdf,.txt,.text,text/plain,application/pdf">
         </label>
       </div>
       <h2>EDITAL VERTICALIZADO</h2>
-      <div class="room-view room-edital">
-      ${window.ATLAS ? Object.entries(ATLAS.vertical()).map(([disc, assuntos]) => `<div class="topic"><strong>${disc}</strong><ul>${assuntos.map((a) => `<li>${a}</li>`).join("")}</ul></div>`).join("") : ""}
-      </div>
-      <p class="sub">Amostra: 9 editais recentes de Guarda (Mauá, Tamandaré, Piumhi, Santa Maria de Jetibá, Nísia Floresta, Caldas Novas, Curitiba, Benevides, Santana do Mundaú) + padrão de prefeituras.</p>
-      <div class="room-view room-edital">
-      ${TOPICS.sort((a,b)=>b.rec-a.rec).map((t) => {
-        const d = DISC.find((x)=>x.id===t.d);
-        const st = S.topic[t.id] || "pendente";
-        const pct = Math.round((Number(t.rec) || 0) * 100);
-        return `<div class="topic">
-          <div class="row">
-            <span class="chip ${t.rec>=0.9?"alta":t.rec>=0.8?"media":"baixa"}">${t.caiu?"CAIÚ EM PROVA":"SÓ EDITAL"}</span>
-            <span class="chip baixa">${d.sigla}</span>
-            <select data-topic="${t.id}">
-              ${["pendente","andamento","revisar","dominado"].map((s)=>`<option ${s===st?"selected":""}>${s}</option>`).join("")}
-            </select>
-          </div>
-          <p style="margin:8px 0 4px">${t.t}</p>
-          <p class="muted">${t.reps}</p>
-          <div class="bar" title="recorrência"><i style="width:${pct}%"></i></div>
-        </div>`;
-      }).join("")}
-      </div>
+      <div class="room-view room-edital">${list}</div>
     `;
   },
   questoes() {
@@ -1397,32 +1404,26 @@ const pages = {
     `;
   },
   sobre() {
-    const a = window.ATLAS ? ATLAS.prefs() : { simpatia: 2, interacao: 2, criatividade: 1, poder: 2 };
-    const p = window.ATLAS ? ATLAS.pulse() : { geral: 0, qScore: 0, hScore: 0, dScore: 0 };
+    const a = window.ATLAS ? ATLAS.prefs() : {};
+    const on = a.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
+    const last = S.iaLast || null;
+    const models = [["chatgpt", "ChatGPT"], ["claude", "Claude"], ["gemini", "Gemini"], ["copilot", "Copilot"]];
     return `
-      <p class="kicker">ATLAS</p>
-      <h1>ATLAS</h1>
-      <p class="sub">Mentor da planilha. Texto ou voz. O que for comando não entra na Turma ao vivo.</p>
+      <p class="kicker">SALA DE IAs</p>
+      <h1>SALA DE IAs</h1>
+      <p class="sub">ChatGPT, Claude, Gemini e Copilot leem o mesmo pedido ao mesmo tempo. A resposta mostra o consenso.</p>
       <div class="card">
-        <div class="atlas-orb" aria-hidden="true"></div>
-        <p>Desempenho geral agora: <strong>${p.geral}%</strong>. Questões ${p.qScore}% · horas ${p.hScore}% · disciplinas ${p.dScore}%.</p>
-        <div class="row" style="margin-top:8px">
-          <button class="btn" id="voiceAsk" type="button">Falar com o ATLAS</button>
+        <div class="ia-row">
+          ${models.map(([id, lab]) => `<button type="button" class="btn ${on[id] ? "" : "ghost"}" data-ia="${id}">${lab}</button>`).join("")}
         </div>
-        ${["simpatia", "interacao", "criatividade", "poder"].map((key) => {
-          const lab = { simpatia: "Simpatia", interacao: "Interação", criatividade: "Criatividade", poder: "Poder" }[key];
-          return `<div class="atlas-levels"><span>${lab}</span>${[0, 1, 2, 3].map((n) => `<button type="button" class="btn ${Number(a[key]) === n ? "" : "ghost"}" data-atlaspref="${key}" data-level="${n}">${n}</button>`).join("")}</div>`;
-        }).join("")}
-        <p class="muted">O botão fala a escolha. Poder alto altera a planilha só quando você pede direto.</p>
-        <div class="row" style="margin-top:8px">
-          <label class="muted">Gemini <input id="atlasGemini" type="password" placeholder="${a.gemini ? "chave salva neste aparelho" : "cole a chave"}" autocomplete="off"></label>
-          <label class="muted">ChatGPT <input id="atlasOpenai" type="password" placeholder="${a.openai ? "chave salva neste aparelho" : "cole a chave"}" autocomplete="off"></label>
+        <div class="row" style="margin-top:10px">
+          ${models.map(([id, lab]) => `<label class="muted">${lab} <input id="key-${id}" type="password" placeholder="${a[id] ? "chave neste aparelho" : "cole a chave"}" autocomplete="off"></label>`).join("")}
         </div>
-        <p class="muted">As duas conversam para fechar o pedido. Sem chave, o ATLAS executa e responde por voz mesmo assim. A chave não sai deste aparelho.</p>
-      </div>
-      <div class="card">
-        <p><strong>Importância</strong> = 65% pontos oficiais (em 90) + 25% presença no edital da amostra + 10% “já caiu em prova”.</p>
-        <p><strong>Desempenho geral</strong> = 50% acerto nas questões + 30% horas batidas na meta da semana + 20% disciplinas marcadas como estudadas. Sem dado, o peso sai da média.</p>
+        <div class="row" style="margin-top:10px">
+          <input id="iaAsk" placeholder="Peça às IAs" style="flex:1">
+          <button class="btn" id="iaSend" type="button">Consultar</button>
+        </div>
+        ${last ? `<p style="margin-top:12px"><strong>Precisão ${last.precision}%.</strong> ${last.votes && last.votes.length ? "Consenso de " + last.votes.join(", ") + "." : "Sem resposta das IAs."}</p><p>${last.say || ""}</p>` : `<p class="muted" style="margin-top:12px">A precisão sobe quando as IAs concordam entre si.</p>`}
       </div>
     `;
   },
@@ -1475,7 +1476,7 @@ const pages = {
     if (q.n) parts.push(q.score);
     if (sim.tot) parts.push(sim.score);
     const geral = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : 0;
-    const foto = me.photo || "./logo-pi.svg";
+    const foto = me.photo || "./logo-a.jpg";
     const metodo = me.metodo || "";
     const qv = (v) => String(v || "").replace(/&/g, "&" + "amp;").replace(/"/g, "&" + "quot;").replace(/</g, "&" + "lt;");
     return `
@@ -1822,6 +1823,31 @@ document.addEventListener("click", (e) => {
       msg.textContent = "Não deu para ler o código. Peça um VG1. novo.";
     }
   }
+  const iaBtn = e.target.closest && e.target.closest("[data-ia]");
+  if (iaBtn && window.ATLAS) {
+    const p = ATLAS.prefs();
+    p.on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
+    p.on[iaBtn.dataset.ia] = !p.on[iaBtn.dataset.ia];
+    save(S);
+    render({ force: true });
+    return;
+  }
+  if (e.target.id === "iaSend" && window.ATLAS) {
+    const inp = $("iaAsk");
+    const text = inp && inp.value.trim();
+    if (!text) return;
+    inp.value = "";
+    const local = ATLAS.exec(text);
+    S.iaLast = { say: "Consultando as IAs…", precision: 0, votes: [] };
+    render({ force: true });
+    ATLAS.askAll(text).then((pack) => {
+      if (local) pack.say = local + (pack.say ? " " + pack.say : "");
+      S.iaLast = pack;
+      save(S);
+      render({ force: true });
+    });
+    return;
+  }
   if (e.target.id === "voiceAsk" || (e.target.closest && e.target.closest("#voiceAsk"))) {
     if (window.ATLAS) { ATLAS.prime(); ATLAS.listen(); }
   }
@@ -1918,6 +1944,13 @@ document.addEventListener("input", (e) => {
   if (e.target.dataset && e.target.dataset.sheet) paintSheetTotals();
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id && e.target.id.indexOf("key-") === 0 && window.ATLAS) {
+    const id = e.target.id.slice(4);
+    const val = String(e.target.value || "").trim();
+    if (val) ATLAS.prefs()[id] = val;
+    save(S, true);
+    return;
+  }
   if (e.target.id === "atlasGemini" || e.target.id === "atlasOpenai") {
     if (!S.atlas) S.atlas = { simpatia: 2, interacao: 2, criatividade: 1, poder: 3 };
     const val = String(e.target.value || "").trim();
@@ -2027,7 +2060,7 @@ readDisk().then((disk) => {
   let parsed = null;
   try { parsed = JSON.parse(disk.raw); } catch (_) {}
   if (parsed && (parsed.savedAt || 0) > (S.savedAt || 0)) {
-    S = { ...defaultState(), ...parsed };
+    S = blankStudy({ ...defaultState(), ...parsed });
     if (!S.sheet) S.sheet = emptySheet();
     render();
   }

@@ -63,6 +63,7 @@
     let local = {};
     try { local = JSON.parse(localStorage.getItem(stateKey(uid)) || "{}"); } catch (_) {}
     const base = Object.assign(defaultState(), local, remote || {});
+    if (typeof blankStudy === "function") blankStudy(base);
     S = base;
     S.me = Object.assign(defaultState().me, S.me || {}, { id: uid, name: name, email: email });
     S.entered = true;
@@ -179,6 +180,7 @@
       log.scrollTop = log.scrollHeight;
     },
     push(msg, broadcast) {
+      if (broadcast) msg.pending = true;
       this.messages = roomSave(this.messages.concat(msg));
       if (broadcast && bus) bus.postMessage({ type: "chat", msg: msg });
       if (broadcast && fb && S && S.entered) {
@@ -211,13 +213,13 @@
     const box = document.getElementById("presenceList");
     if (!box) return;
     const uid = S && S.me && S.me.id;
-    const names = (list || []).map((p) => p.id === uid ? (p.name || "você") + " (você)" : (p.name || "aluno"));
-    box.textContent = names.length ? names.join(" · ") : "só você";
+    const names = (list || []).map((p) => (p.id === uid ? "você" : (p.name || "aluno")) + " · online");
+    box.textContent = names.length ? names.join(" · ") : "ninguém online";
   }
   function beat() {
     if (!S || !S.entered || !S.me || !S.me.id) return;
     const now = Date.now();
-    const others = readPresence().filter((p) => p.id !== S.me.id && now - (p.ts || 0) < 20000);
+    const others = readPresence().filter((p) => p.id !== S.me.id && now - (p.ts || 0) < 12000);
     const mine = { id: S.me.id, name: (S.me.name || "Aluno"), ts: now };
     const list = others.concat(mine);
     try { localStorage.setItem(PRESENCE_KEY, JSON.stringify(list)); } catch (_) {}
@@ -241,9 +243,9 @@
       const list = [];
       snap.forEach((doc) => {
         const d = doc.data() || {};
-        if (now - (d.ts || 0) < 25000) list.push({ id: doc.id, name: d.name || "aluno", ts: d.ts });
+        if (now - (d.ts || 0) < 12000) list.push({ id: doc.id, name: d.name || "aluno", ts: d.ts });
       });
-      if (list.length) paintPresence(list);
+      paintPresence(list);
     }, () => {});
     fb.db.collection("room").orderBy("ts").limitToLast(40).onSnapshot((snap) => {
       const next = [];
@@ -251,17 +253,16 @@
         const d = doc.data() || {};
         next.push({ id: doc.id, uid: d.uid, name: d.name, text: d.text || "", ts: d.ts || 0 });
       });
-      if (next.length) {
-        PIRoom.messages = next;
-        const log = document.getElementById("dockLog");
-        if (log) PIRoom.paint(log);
-      }
+      const pending = (PIRoom.messages || []).filter((m) => m.pending && !next.some((n) => n.uid === m.uid && n.text === m.text && Math.abs((n.ts || 0) - (m.ts || 0)) < 15000));
+      PIRoom.messages = next.concat(pending).sort((a, b) => (a.ts || 0) - (b.ts || 0)).slice(-40);
+      const log = document.getElementById("dockLog");
+      if (log) PIRoom.paint(log);
     }, () => {});
   }
   function afterEnter() {
     beat();
     if (timer) clearInterval(timer);
-    timer = setInterval(beat, 8000);
+    timer = setInterval(beat, 4000);
     listenFirebase();
     const log = document.getElementById("dockLog");
     if (log) PIRoom.paint(log);
