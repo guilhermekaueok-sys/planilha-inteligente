@@ -368,58 +368,95 @@
     prefs()[key] = Math.max(0, Math.min(3, Number(n) || 0));
     return levelLine(key);
   }
+  function prepareSpeech(text) {
+    var s = String(text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    s = s.replace(/R\$\s*/g, "");
+    s = s.replace(/(\d)\s*%/g, "$1 por cento");
+    s = s.replace(/\bIAs\b/g, "iás");
+    s = s.replace(/\bIA\b/g, "iá");
+    return s.slice(0, 700);
+  }
   function chooseVoice() {
     var list = window.speechSynthesis ? window.speechSynthesis.getVoices() || [] : [];
-    var female = /female|mulher|luciana|francisca|helena|fernanda|vit[oó]ria|maria|samantha|victoria|zira|susan|karen|moira|fiona|joana|alice/;
-    var male = /daniel|david|george|alex|aaron|rishi|arthur|fred|malcolm|bruce|ralph|albert|antonio|felipe|ricardo|joao|joão|sergio|sérgio|male/;
     var best = null;
     var score = -1;
     list.forEach(function (v) {
-      var n = (v.name + " " + v.lang).toLowerCase();
-      if (female.test(n) && !male.test(n)) return;
-      if (/portugu[eê]s do brasil|portuguese/.test(n) && !male.test(n)) return;
-      var s = 0;
-      if (male.test(n)) s += 6;
-      if (/en-gb|en_gb|uk english/.test(n)) s += 4;
-      if (/pt/.test(v.lang) && male.test(n)) s += 3;
+      var lang = String(v.lang || "").toLowerCase().replace("_", "-");
+      if (lang.indexOf("pt-br") !== 0 && lang !== "pt") return;
+      var n = (v.name + " " + lang).toLowerCase();
+      var s = 10;
+      if (/neural|natural|google|premium|wavenet/.test(n)) s += 8;
+      if (/portugu[eê]s do brasil/.test(n)) s += 6;
+      if (/male|masculin|antonio|felipe|ricardo|daniel/.test(n)) s += 3;
       if (s > score) { score = s; best = v; }
     });
     return best;
   }
-  function prime() {
-    if (!window.speechSynthesis) return;
-    try {
-      window.speechSynthesis.resume();
-      var u = new SpeechSynthesisUtterance(" ");
-      u.volume = 0.02;
-      u.pitch = 0.7;
-      u.rate = 0.94;
-      var v = chooseVoice();
-      if (v) { u.voice = v; u.lang = v.lang; }
-      else u.lang = "en-GB";
-      window.speechSynthesis.speak(u);
-    } catch (e) {}
+  var talkAudio = null;
+  function stopTalk() {
+    document.documentElement.classList.remove("atlas-talk");
+    if (talkAudio) {
+      talkAudio.pause();
+      talkAudio = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
   }
-  function speak(text) {
+  function speakLocal(said) {
     if (!window.speechSynthesis) return;
-    var said = String(text || "").replace(/<[^>]+>/g, "");
-    if (!said) return;
     window.speechSynthesis.resume();
     var u = new SpeechSynthesisUtterance(said);
     var v = chooseVoice();
-    if (v) { u.voice = v; u.lang = v.lang; }
-    else u.lang = "en-GB";
-    u.pitch = 0.68;
-    u.rate = 0.94;
+    u.lang = "pt-BR";
+    if (v) u.voice = v;
+    u.pitch = 1;
+    u.rate = 1;
     u.volume = 1;
     var on = function () { document.documentElement.classList.add("atlas-talk"); };
     var off = function () { document.documentElement.classList.remove("atlas-talk"); };
     u.onstart = on;
     u.onend = off;
     u.onerror = off;
-    on();
     window.speechSynthesis.cancel();
-    setTimeout(function () { window.speechSynthesis.speak(u); }, 80);
+    setTimeout(function () { window.speechSynthesis.speak(u); }, 60);
+  }
+  function prime() {
+    if (!window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.resume();
+      var u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0.01;
+      u.lang = "pt-BR";
+      u.rate = 1;
+      var v = chooseVoice();
+      if (v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function speak(text) {
+    var said = prepareSpeech(text);
+    if (!said) return;
+    stopTalk();
+    var key = String((prefs().chatgpt || prefs().openai || "")).trim();
+    if (!key) { speakLocal(said); return; }
+    document.documentElement.classList.add("atlas-talk");
+    fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: key, text: said }),
+    }).then(function (r) {
+      if (!r.ok) throw new Error("voz");
+      return r.blob();
+    }).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var audio = new Audio(url);
+      talkAudio = audio;
+      audio.onended = function () {
+        document.documentElement.classList.remove("atlas-talk");
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = function () { speakLocal(said); };
+      audio.play().catch(function () { speakLocal(said); });
+    }).catch(function () { speakLocal(said); });
   }
   function listen() {
     prime();
