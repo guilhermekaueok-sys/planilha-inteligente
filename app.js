@@ -1382,12 +1382,12 @@ const pages = {
     const dScore = pulse && pulse.planned ? pulse.dScore : 0;
     const hScore = pulse && pulse.hoursPlan ? pulse.hScore : 0;
     return `
+      <div class="news-rail" aria-label="Radar de notícias">${window.PIRadar ? PIRadar.mini() : ""}</div>
       <div class="hero-title">
         <div>
           <h1>DESEMPENHO GERAL</h1>
           <p class="muted">Semana ${S.week}</p>
         </div>
-        <div class="news-rail" aria-label="Radar de notícias">${window.PIRadar ? PIRadar.mini() : ""}</div>
       </div>
       <div class="dash-hero">
         <div class="card ring-card">

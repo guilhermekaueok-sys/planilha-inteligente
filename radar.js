@@ -47,7 +47,11 @@
   }
   function items() { return fresh(live); }
   function mini() {
-    return items().map(function (n) {
+    var ordem = ["qc", "est", "gran"];
+    var todos = items();
+    var tres = ordem.map(function (k) { return todos.find(function (n) { return n.key === k; }); }).filter(Boolean);
+    if (tres.length < 3) tres = todos.slice(0, 3);
+    return tres.map(function (n) {
       return '<a class="news-chip src-' + n.key + '" href="' + esc(n.href) + '" target="_blank" rel="noopener"><span>' + esc(n.source) + '</span><b>' + esc(n.title) + '</b></a>';
     }).join("");
   }
