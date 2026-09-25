@@ -969,6 +969,11 @@ function loadPdfJs() {
     document.head.appendChild(s);
   });
 }
+function textoUtil(s) {
+  const t = String(s || "");
+  if (t.replace(/\s/g, "").length < 80) return false;
+  return /cargo|taxa|inscri|prova|conte[uú]do|disciplina/i.test(t);
+}
 async function textFromPdf(buf) {
   const pdfjs = await loadPdfJs();
   const doc = await pdfjs.getDocument({ data: buf }).promise;
@@ -990,8 +995,9 @@ async function textFromPdf(buf) {
     });
     out += line.trim() + "\n";
   }
-  if (out.replace(/\s/g, "").length >= 80) return out;
-  return ocrPdf(doc);
+  if (textoUtil(out)) return out;
+  const ocr = await ocrPdf(doc);
+  return (out + "\n" + ocr).trim();
 }
 function loadTesseract() {
   if (window.Tesseract) return Promise.resolve(window.Tesseract);
@@ -1045,11 +1051,12 @@ function arranjarOcr(text) {
 }
 function recortarCarimbo(canvas, largura, altura, caixa) {
   if (window.PISemRecorte || /sem-recorte/.test(String(location.search || ""))) return canvas;
-  const c = caixa || window.PIRecorte || {};
-  const x0 = c.x0 == null ? 480 : c.x0;
+  const c = caixa || window.PIRecorte;
+  if (!c) return canvas;
+  const x0 = c.x0 == null ? 0 : c.x0;
   const top = c.top == null ? 0 : c.top;
   const x1 = c.x1 == null ? largura : c.x1;
-  const bottom = c.bottom == null ? 80 : c.bottom;
+  const bottom = c.bottom == null ? 0 : c.bottom;
   const sx = canvas.width / largura;
   const sy = canvas.height / altura;
   const ctx = canvas.getContext("2d");
@@ -1065,11 +1072,11 @@ async function ocrPdf(doc) {
     langPath: "https://tessdata.projectnaptha.com/4.0.0",
   });
   let out = "";
-  const n = Math.min(doc.numPages, 4);
+  const n = Math.min(doc.numPages, 8);
   try {
     for (let i = 1; i <= n; i++) {
       const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale: 2.6 });
+      const viewport = page.getViewport({ scale: 2 });
       const base = document.createElement("canvas");
       base.width = Math.floor(viewport.width);
       base.height = Math.floor(viewport.height);
@@ -1083,22 +1090,21 @@ async function ocrPdf(doc) {
       let best = "";
       let bestN = -1;
       for (let k = 0; k < imgs.length; k++) {
-        const modos = k === 0 ? ["4", "6"] : ["6"];
-        for (let p = 0; p < modos.length; p++) {
-          await worker.setParameters({
-            tessedit_pageseg_mode: modos[p],
-            user_defined_dpi: "300",
-            preserve_interword_spaces: "1",
-          });
-          const res = await worker.recognize(imgs[k]);
-          const text = arranjarOcr(res && res.data && res.data.text ? res.data.text : "");
-          const n = notaOcr(text);
-          if (n > bestN) { best = text; bestN = n; }
-          if (bestN >= 14) break;
+        await worker.setParameters({
+          tessedit_pageseg_mode: "6",
+          user_defined_dpi: "300",
+          preserve_interword_spaces: "1",
+        });
+        const res = await worker.recognize(imgs[k]);
+        const text = arranjarOcr(res && res.data && res.data.text ? res.data.text : "");
+        const score = notaOcr(text) + Math.min(10, (text.match(/\n/g) || []).length);
+        if (score > bestN) {
+          best = text;
+          bestN = score;
         }
-        if (bestN >= 14) break;
       }
       out += best + "\n";
+      if (i >= 2 && /conte[uú]do program[aá]tico/i.test(out) && out.length > 1500) break;
     }
   } finally {
     await worker.terminate();
@@ -2372,8 +2378,14 @@ document.addEventListener("change", (e) => {
     };
     reader.onload = () => {
       if (/\.pdf$/i.test(file.name)) {
-        textFromPdf(reader.result).then(finish).catch(() => finish(""));
-      } else finish(String(reader.result || ""));
+        textFromPdf(reader.result).then(finish).catch((err) => {
+          S.editalAviso = "Falha ao ler o PDF: " + (err && err.message ? err.message : "erro desconhecido");
+          save(S);
+          finish("");
+        });
+      } else {
+        finish(String(reader.result || ""));
+      }
     };
     if (/\.pdf$/i.test(file.name)) reader.readAsArrayBuffer(file);
     else reader.readAsText(file);
