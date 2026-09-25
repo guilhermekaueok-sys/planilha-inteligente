@@ -877,40 +877,67 @@ function discSigla(name) {
 }
 function parseEditalText(raw) {
   const text = String(raw || "").replace(/\r/g, "");
-  const lines = text.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
-  const flat = lines.join(" ");
-  const cargo = (flat.match(/cargo\s*[:\-]\s*([^.]{4,80})/i) || [])[1] || "";
-  const banca = (flat.match(/\b(IDIB|VUNESP|CESPE|CEBRASPE|AOCP|IBFC|FGV|FUNDATEC|SELECON|CONSULPLAN|INQC|ABCP|QUADRIX|INSTITUTO AOCP)\b/i) || [])[1] || "";
-  const prova = (flat.match(/(?:data da prova|prova objetiva)[^\d]{0,24}(\d{1,2}\/\d{2}\/\d{4})/i) || [])[1] || "";
-  const insc = (flat.match(/inscri[cç][aã]o[^\d]{0,40}(\d{1,2}\/\d{2}\/\d{4}.{0,24}\d{1,2}\/\d{2}\/\d{4})/i) || [])[1] || "";
-  const taxa = (flat.match(/R\$\s*[\d.]+(?:,\d{2})?/) || [])[0] || "";
-  const link = (flat.match(/https?:\/\/[^\s)]+/) || [])[0] || "";
-  const hint = /portugu[eê]s|matem[aá]tica|racioc[ií]nio|inform[aá]tica|direito|legisla[cç][aã]o|administra[cç][aã]o|constitucional|penal|processo|contabilidade|atualidades|conhecimentos|l[ií]ngua|reda[cç][aã]o|estatuto|hist[oó]ria|geografia|no[cç][oõ]es|seguran[cç]a|guarda|sa[uú]de|enfermagem|pedagogia|f[ií]sica|qu[ií]mica|biologia|ingl[eê]s|espanhol/i;
+  const flat = text.replace(/\s+/g, " ");
+  const cargoM = flat.match(/(?:para o cargo de|cargo pretendido|denomina[cç][aã]o do cargo)\s*[:\-]?\s*([A-Za-zÀ-ú][^.]{3,70})/i)
+    || flat.match(/\bcargo\s*[:\-]\s*([A-Za-zÀ-ú][^.]{3,70})/i);
+  let cargo = cargoM ? cargoM[1].trim() : "";
+  cargo = cargo.split(/\s+(?:,|taxa\b|banca\b|prova\b|remunera|inscri|per[ií]odo|r\$)/i)[0].trim();
+  cargo = cargo.replace(/\s+(do concurso|do edital|da inscri[cç][aã]o).*/i, "").trim();
+  if (/inscri|deferiment|comprovante|disposi/i.test(cargo)) cargo = "";
+  const tight = cargo.match(/[A-Za-zÀ-ú]{4,}(?:\s+[A-Za-zÀ-ú]{3,}){0,3}/);
+  if (tight) cargo = tight[0];
+  const bancaSpot = flat.slice(Math.max(0, flat.toLowerCase().indexOf("banca")), Math.max(0, flat.toLowerCase().indexOf("banca")) + 80);
+  const banca = ((bancaSpot.match(/\b(IDIB|VUNESP|CESPE|CEBRASPE|AOCP|IBFC|FGV|FUNDATEC|SELECON|CONSULPLAN|INQC|ABCP|QUADRIX)\b/i) || [])[1]
+    || (flat.match(/\b(IDIB|VUNESP|CESPE|CEBRASPE|AOCP|IBFC|FGV|FUNDATEC|SELECON|CONSULPLAN|INQC|ABCP|QUADRIX)\b/i) || [])[1]
+    || "").toUpperCase();
+  const prova = (flat.match(/(?:data da prova|prova objetiva|realiza[cç][aã]o da prova)[^\d]{0,30}(\d{1,2}\/\d{2}\/\d{4})/i) || [])[1] || "";
+  const insc = (flat.match(/(?:per[ií]odo de inscri[cç][aã]o|as inscri[cç][oõ]es)[^\d]{0,40}(\d{1,2}\/\d{2}\/\d{4}\s*(?:a|at[eé]|–|-)\s*\d{1,2}\/\d{2}\/\d{4})/i) || [])[1] || "";
+  const taxaM = flat.match(/taxa de inscri[cç][aã]o[^R]{0,60}(R\$\s*[\d.]+,\d{2})/i)
+    || flat.match(/(R\$\s*[\d.]+,\d{2})[^.]{0,40}(?:referente [aà] taxa|taxa de inscri)/i);
+  const taxa = taxaM ? taxaM[1].replace(/\s+/g, " ") : "";
+  const low = text.toLowerCase();
+  const marks = ["conteúdo programático", "conteudo programatico", "conteúdos programáticos", "conteudos programaticos", "conteúdo da prova"];
+  let start = -1;
+  marks.forEach((k) => {
+    const i = low.indexOf(k);
+    if (i >= 0 && (start < 0 || i < start)) start = i;
+  });
+  if (start < 0) {
+    ["programa das provas", "programa da prova", "conhecimentos básicos", "conhecimentos específicos", "conhecimentos especificos"].forEach((k) => {
+      const i = low.indexOf(k);
+      if (i >= 0 && (start < 0 || i < start)) start = i;
+    });
+  }
+  const chunk = start >= 0 ? text.slice(start, start + 18000) : "";
+  const lines = chunk.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const blocked = /inscri[cç]|deferiment|comprovante|disposi[cç]|vagas reserv|avalia[cç][aã]o de sa[uú]de|taxa|elimina|cronograma|recurso|sum[aá]rio|homolog|convoca[cç]|remunera|r\$|preliminar|do cargo|da inscri/i;
   const discs = [];
   const topics = [];
   let cur = null;
   const seen = {};
   lines.forEach((line) => {
-    if (line.length > 90) return;
-    const qtd = line.match(/^(.{4,70}?)\s*[-–:]\s*(\d{1,3})\s*quest/i);
-    const head = line.replace(/\s+\d{1,3}\s*quest(?:ões|oes)?\.?$/i, "").replace(/[:\-–]\s*$/, "");
-    const looks = hint.test(head) && head.length <= 70 && !/^\d+[\.\)]/.test(head) && head.split(" ").length <= 10;
-    const onlyName = looks && !/[.]/.test(head) && head.split(" ").length <= 8;
-    if (qtd || onlyName) {
-      const name = (qtd ? qtd[1] : head).replace(/^\d+[\.\)]\s*/, "").trim();
-      const id = discIdOf(name);
-      if (seen[id] || name.length < 4) return;
-      seen[id] = 1;
-      cur = { id: id, sigla: discSigla(name), name: name, pesoOf: 1, pts: qtd ? Number(qtd[2]) : 1, q: qtd ? Number(qtd[2]) : 0, editais: 1, provas: 1, n: 1 };
-      discs.push(cur);
+    if (/conte[uú]do program|programa da prova|programa das provas|conhecimentos b[aá]sicos|conhecimentos espec/i.test(line)) return;
+    if (blocked.test(line)) { cur = null; return; }
+    if (/^\d+[\.\)]\s+\S/.test(line) || /^[-•]\s+\S/.test(line)) {
+      if (!cur) return;
+      topics.push({ id: "u" + topics.length, disc: cur.name, d: cur.id, t: line.replace(/^(?:\d+[\.\)]|[-•])\s+/, "").slice(0, 180) });
       return;
     }
-    if (cur && /^(?:\d+[\.\)]|[-•])\s+\S/.test(line)) {
-      topics.push({ id: "u" + topics.length, disc: cur.name, d: cur.id, t: line.replace(/^(?:\d+[\.\)]|[-•])\s+/, "").slice(0, 180) });
-    }
+    if (line.length < 4 || line.length > 72 || /[.]/.test(line)) return;
+    const words = line.split(/\s+/);
+    if (words.length > 10) return;
+    const letters = line.replace(/[^A-Za-zÀ-ú]/g, "");
+    const ups = letters.replace(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇ]/g, "");
+    if (letters.length < 4 || ups.length / letters.length < 0.65) return;
+    const name = line.replace(/[:\-–]\s*$/, "").trim();
+    const id = discIdOf(name);
+    if (seen[id]) { cur = discs.find((d) => d.id === id) || cur; return; }
+    seen[id] = 1;
+    cur = { id: id, sigla: discSigla(name), name: name, pesoOf: 1, pts: 1, q: 0, editais: 1, provas: 1, n: 1 };
+    discs.push(cur);
   });
   return {
-    meta: { cargo: cargo.trim(), prova: prova, banca: banca, inscricao: insc, taxa: taxa, linkInscricao: link, linkBanca: "" },
+    meta: { cargo: cargo, prova: prova, banca: banca, inscricao: insc, taxa: taxa, linkInscricao: "", linkBanca: "", aviso: "" },
     discs: discs,
     topics: topics,
   };

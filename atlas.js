@@ -686,7 +686,16 @@
     };
   }
   function lerEdital(text) {
-    var clip = clipEdital(text);
+    var local = typeof parseEditalText === "function" ? parseEditalText(text) : null;
+    if (local && local.discs && local.discs.length) {
+      local.meta.aviso = "";
+      return Promise.resolve(local);
+    }
+    if (local && (local.meta.cargo || local.meta.taxa || local.meta.banca)) {
+      local.meta.aviso = "Os campos foram lidos. O conteúdo programático não veio separado neste arquivo.";
+      return Promise.resolve(local);
+    }
+    var clip = clipEdital(text).slice(0, 5000);
     if (clip.length < 40) return Promise.resolve({ meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "O arquivo não trouxe texto para ler." }, discs: [], topics: [] });
     var p = prefs();
     var on = p.on || { chatgpt: true, claude: true, gemini: true, copilot: true };
@@ -697,32 +706,19 @@
       { id: "copilot", which: "copilot", key: oauthMem.copilot || p.copilot },
     ].filter(function (m) { return on[m.id] !== false && m.key; });
     if (!models.length) {
-      return Promise.resolve({ meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "Nenhuma chave neste aparelho. Cole a chave da IA para ler o edital." }, discs: [], topics: [] });
+      return Promise.resolve({ meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "Não achei o conteúdo programático neste arquivo." }, discs: [], topics: [] });
     }
-    var prompt = "Você lê edital de concurso público no Brasil. Devolva somente JSON, sem markdown, neste formato: {\"cargo\":\"\",\"prova\":\"\",\"banca\":\"\",\"inscricao\":\"\",\"taxa\":\"\",\"disciplinas\":[{\"nome\":\"\",\"assuntos\":[\"\"]}]}. cargo é o cargo do concurso, não título de seção. prova é a data da prova. banca é a organizadora. inscricao é o período de inscrição. taxa é só o valor da taxa de inscrição do cargo. disciplinas são só o conteúdo programático da prova, com os assuntos de cada matéria. Proibido colocar inscrição, taxa, vagas, reserva, deficiência, saúde, deferimento, comprovante ou disposições gerais dentro de disciplinas. Não invente o que não estiver no texto. Se não achar, deixe vazio. TEXTO:\n" + clip;
+    var prompt = "Extraia o edital e devolva só JSON {\"cargo\":\"\",\"prova\":\"\",\"banca\":\"\",\"inscricao\":\"\",\"taxa\":\"\",\"disciplinas\":[{\"nome\":\"\",\"assuntos\":[\"\"]}]}. Só conteúdo programático nas disciplinas. TEXTO:\n" + clip;
     return Promise.all(models.map(function (m) {
-      return askModel(m.which, m.key, prompt).then(function (out) {
-        return shapeEdital(out);
-      }).catch(function () { return null; });
+      return askModel(m.which, m.key, prompt).then(function (out) { return shapeEdital(out); }).catch(function () { return null; });
     })).then(function (packs) {
-      var ok = packs.filter(function (x) { return x && (x.discs.length || x.meta.cargo || x.meta.taxa); });
+      var ok = packs.filter(function (x) { return x && x.discs && x.discs.length; });
       if (!ok.length) {
-        return { meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "As IAs não fecharam o resumo. Confira a chave e anexe de novo." }, discs: [], topics: [] };
+        return local || { meta: { cargo: "", prova: "", banca: "", inscricao: "", taxa: "", aviso: "Não achei o conteúdo programático neste arquivo." }, discs: [], topics: [] };
       }
-      ok.sort(function (a, b) { return (b.topics.length + b.discs.length) - (a.topics.length + a.discs.length); });
+      ok.sort(function (a, b) { return b.topics.length - a.topics.length; });
       var best = ok[0];
-      ["cargo", "prova", "banca", "inscricao", "taxa"].forEach(function (k) {
-        if (best.meta[k]) return;
-        var hits = {};
-        ok.forEach(function (row) {
-          var v = row.meta[k];
-          if (v) hits[v] = (hits[v] || 0) + 1;
-        });
-        var top = "";
-        var n = 0;
-        Object.keys(hits).forEach(function (v) { if (hits[v] > n) { n = hits[v]; top = v; } });
-        best.meta[k] = top;
-      });
+      if (local) ["cargo", "prova", "banca", "inscricao", "taxa"].forEach(function (k) { if (!best.meta[k]) best.meta[k] = local.meta[k] || ""; });
       best.meta.aviso = "";
       return best;
     });
