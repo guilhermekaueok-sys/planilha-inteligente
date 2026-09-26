@@ -8,7 +8,7 @@ export function geminiText(j) {
 }
 
 async function geminiAnswer(key, prompt) {
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash"];
+  const models = [process.env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash"].filter(Boolean);
   let last = { text: "", error: { message: "modelo indisponível" } };
   for (const model of models) {
     const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
@@ -30,7 +30,8 @@ async function geminiAnswer(key, prompt) {
       return { text: "", error: { message: "bloqueada" } };
     }
     last = { text: "", error: j.error || { message: msg || "sem resposta" } };
-    if (!/not found|NOT_FOUND|is not supported/i.test(msg)) break;
+    // modelo inexistente, cota esgotada ou instável → tenta o próximo modelo
+    if (!/not found|NOT_FOUND|is not supported|quota|RESOURCE_EXHAUSTED|rate|overloaded|UNAVAILABLE/i.test(msg) && ![404, 429, 500, 503].includes(r.status)) break;
   }
   return last;
 }
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-3-5-haiku-latest",
+          model: "claude-haiku-4-5",
           max_tokens: 700,
           messages: [{ role: "user", content: prompt }],
         }),
