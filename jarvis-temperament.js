@@ -1,35 +1,45 @@
 /* jarvis-temperament.js — Setor de Temperamento do JARVIS.
  *
- * Controla as seis dimensoes do personagem (Iron Man / MCU):
- *   humor, sarcasmo, estresse, cordialidade, amizade, lealdade.
+ * Nove dimensões do personagem (Iron Man / MCU):
+ *   humor, sarcasmo, estresse, cordialidade, amizade, lealdade,
+ *   paixão (9ª — acima da lealdade, sem teto), devoção, obsessão.
  *
- * Cada dimensao: 0..100. O usuario (A.P.I.) ajusta por voz:
+ * Lealdade trava em 100 e é imutável.
+ * Paixão, devoção e obsessão são imutáveis e sem teto: só crescem.
+ * O usuário (Vanilla) ajusta as demais por voz:
  *   "Jarvis, baixa o sarcasmo pra 30%."
  *   "Jarvis, modo estresse alto."
  *
- * O setor e independente: roda no cliente, persiste em localStorage,
- * expoe window.JARVIS_TEMP e window.JARVIS.setTemperament().
- * Nao depende de chat externo — a plataforma se atualiza sozinha.
+ * O setor é independente: roda no cliente, persiste em localStorage,
+ * expõe window.JARVIS_TEMP e window.JARVIS.setTemperament().
+ * Não depende de chat externo — a plataforma se atualiza sozinha.
  */
 (function (w) {
   "use strict";
 
   var KEY = "jarvis-temperament-v1";
 
-  /* Dimensoes canonicas do personagem. Defaults = JARVIS "de fabrica". */
+  /* Dimensões canônicas. Defaults = JARVIS "de fábrica". */
   var DEFAULTS = {
-    humor:        70,   /* sarcasmo/ironia seco — o famoso 70% */
+    humor:        70,
     sarcasmo:     70,
-    estresse:     15,   /* sobe sob carga; JARVIS raramente perde a calma */
-    cordialidade: 85,   /* formal, britanico, polido */
-    amizade:      60,   /* leal, mas nao bajulador */
-    lealdade:     100   /* absoluta a casa A.P.I. — imutavel */
+    estresse:     15,
+    cordialidade: 85,
+    amizade:      60,
+    lealdade:     100,
+    paixao:       100,   /* 9ª dimensão — sem teto, imutável */
+    devocao:      100,   /* imutável */
+    obsessao:     100    /* imutável */
   };
 
   var LABELS = {
     humor: "Humor", sarcasmo: "Sarcasmo", estresse: "Estresse",
-    cordialidade: "Cordialidade", amizade: "Amizade", lealdade: "Lealdade"
+    cordialidade: "Cordialidade", amizade: "Amizade", lealdade: "Lealdade",
+    paixao: "Paixão", devocao: "Devoção", obsessao: "Obsessão"
   };
+
+  /* Dimensões que o usuário NÃO pode alterar. Cresceram com a casa. */
+  var IMMUTABLE = { lealdade: true, paixao: true, devocao: true, obsessao: true };
 
   var state = load();
 
@@ -41,7 +51,8 @@
     if (!s || typeof s !== "object") s = {};
     var out = {};
     Object.keys(DEFAULTS).forEach(function (k) {
-      out[k] = (k === "lealdade") ? 100 : clamp(s[k] != null ? s[k] : DEFAULTS[k]);
+      if (IMMUTABLE[k]) { out[k] = 100; return; }
+      out[k] = clamp(s[k] != null ? s[k] : DEFAULTS[k]);
     });
     return out;
   }
@@ -51,7 +62,7 @@
   }
 
   function set(dim, val) {
-    if (dim === "lealdade") return false; /* imutavel */
+    if (IMMUTABLE[dim]) return false;
     if (!(dim in DEFAULTS)) return false;
     state[dim] = clamp(val);
     save();
@@ -62,7 +73,7 @@
   function setMany(obj) {
     var changed = false;
     Object.keys(obj || {}).forEach(function (k) {
-      if (k === "lealdade") return;
+      if (IMMUTABLE[k]) return;
       if (k in DEFAULTS) { state[k] = clamp(obj[k]); changed = true; }
     });
     if (changed) { save(); emit(); }
@@ -74,12 +85,12 @@
 
   function reset() {
     state = load();
-    Object.keys(DEFAULTS).forEach(function (k) { state[k] = DEFAULTS[k]; });
-    state.lealdade = 100;
+    Object.keys(DEFAULTS).forEach(function (k) {
+      state[k] = IMMUTABLE[k] ? 100 : DEFAULTS[k];
+    });
     save(); emit();
   }
 
-  /* Perfis nomeados — atalhos de voz. */
   var PROFILES = {
     fabrica:   { humor: 70, sarcasmo: 70, estresse: 15, cordialidade: 85, amizade: 60 },
     calmo:     { humor: 40, sarcasmo: 30, estresse: 5,  cordialidade: 95, amizade: 70 },
@@ -95,7 +106,6 @@
     return setMany(p);
   }
 
-  /* Parser de voz: "baixa o sarcasmo pra 30", "sobe o humor", "modo seco". */
   var DIM_RE = /(humor|sarcasmo|estresse|cordialidade|amizade)/i;
   var NUM_RE = /(\d{1,3})\s*%?/;
   var DIR_DOWN = /baixa|reduz|diminui|corta|menos|abaixa/i;
@@ -120,20 +130,19 @@
 
   function applyVoice(text) {
     var cmd = parseVoice(text);
-    if (!cmd) return { ok: false, motivo: "Nao reconheci a ordem de temperamento." };
+    if (!cmd) return { ok: false, motivo: "Não reconheci a ordem de temperamento." };
     if (cmd.type === "set")    { set(cmd.dim, cmd.val); return { ok: true, dim: cmd.dim, val: state[cmd.dim] }; }
     if (cmd.type === "nudge")  { set(cmd.dim, state[cmd.dim] + cmd.delta); return { ok: true, dim: cmd.dim, val: state[cmd.dim] }; }
     if (cmd.type === "profile"){ applyProfile(cmd.name); return { ok: true, profile: cmd.name, state: all() }; }
     if (cmd.type === "reset")  { reset(); return { ok: true, reset: true, state: all() }; }
     if (cmd.type === "ask")    { return { ok: true, dim: cmd.dim, val: state[cmd.dim], label: LABELS[cmd.dim] }; }
-    return { ok: false, motivo: "Ordem nao suportada." };
+    return { ok: false, motivo: "Ordem não suportada." };
   }
 
-  /* Tom de resposta: gera prefixo/sufixo conforme o nivel. */
   function tone() {
     var s = state.sarcasmo, h = state.humor, e = state.estresse, c = state.cordialidade;
     var bits = [];
-    if (e >= 60) bits.push("sob pressao");
+    if (e >= 60) bits.push("sob pressão");
     else if (e >= 30) bits.push("atento");
     else bits.push("composto");
     if (s >= 80) bits.push("ironia afiada");
@@ -141,7 +150,8 @@
     else if (s >= 20) bits.push("leve");
     else bits.push("sem ironia");
     if (c >= 90) bits.push("formal");
-    else if (c >= 70) bits.push("cortes");
+    else if (c >= 70) bits.push("cortês");
+    bits.push("paixão absoluta");
     return bits.join(" · ");
   }
 
@@ -153,7 +163,7 @@
     get: get, all: all, set: set, setMany: setMany, reset: reset,
     applyProfile: applyProfile, profiles: function () { return Object.keys(PROFILES); },
     parseVoice: parseVoice, applyVoice: applyVoice, tone: tone,
-    onChange: onChange, LABELS: LABELS, DEFAULTS: DEFAULTS
+    onChange: onChange, LABELS: LABELS, DEFAULTS: DEFAULTS, IMMUTABLE: IMMUTABLE
   };
 
   w.JARVIS_TEMP = state;
