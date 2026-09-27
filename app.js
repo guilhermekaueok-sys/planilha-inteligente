@@ -1313,7 +1313,7 @@ function render(opts) {
     paintTour();
     applyZoom();
     applyView();
-    if (!pages[page]) page = "comando";
+    if (page === "sobre" || !pages[page]) page = "comando";
     const view = $("view");
     const keep = page === "planilha" && view && view.querySelector("#sheetRoot")
       && window.PI && PI.typingIn(view) && !(opts && opts.force);
@@ -1437,17 +1437,6 @@ const pages = {
             <div class="metric-hit" data-metric="port"><b>${port}%</b><span class="muted">Português</span></div>
             <div class="metric-hit" data-metric="online"><b>${m.online}%</b><span class="muted">Online</span></div>
           </div>
-        </div>
-        <div class="card copilot">
-          <div class="atlas-orb" aria-hidden="true"></div>
-          <p class="copilot-lead">Comando fica só com você. A turma não vê.</p>
-          <h2 class="ask-title">Pergunte às IAs</h2>
-          <p class="ask-sub">Assistentes integrados: ChatGPT, Claude, Gemini e Copilot.</p>
-          <div class="wave">${"<i></i>".repeat(18)}</div>
-          <button class="voice-btn" id="voiceAsk" type="button">
-            <strong>${userName() || "Seu nome"}</strong>
-            <span>Peça por voz. Ex.: adicione 2 horas de Direito Administrativo na terça.</span>
-          </button>
         </div>
         <div class="card">
           <div class="muted">GRAU DE DISCIPLINAS</div>
